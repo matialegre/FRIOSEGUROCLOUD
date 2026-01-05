@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>RIFT Monitor - Parametican Silver</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #334155;
+            --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            --radius: 16px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+            padding: 24px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-text span {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.15);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 0.875rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.offline { background: var(--danger); animation: none; }
+        .status-dot.warning { background: var(--warning); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            display: none;
+            background: linear-gradient(135deg, var(--danger) 0%, #b91c1c 100%);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 24px;
+            animation: alertPulse 1s infinite;
+            box-shadow: 0 0 60px rgba(239, 68, 68, 0.4);
+        }
+
+        .alert-banner.active { display: block; }
+
+        @keyframes alertPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.01); }
+        }
+
+        .alert-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .alert-icon {
+            font-size: 48px;
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+        }
+
+        .alert-text h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .alert-text p {
+            opacity: 0.9;
+        }
+
+        .alert-actions {
+            margin-left: auto;
+        }
+
+        .btn-silence {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.4);
+            color: white;
+            padding: 12px 24px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-silence:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05);
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .grid-full {
+            grid-column: 1 / -1;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        /* Temperature Display */
+        .temp-display {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .temp-value {
+            font-size: 5rem;
+            font-weight: 800;
+            letter-spacing: -4px;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--success) 0%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .temp-value.warning {
+            background: linear-gradient(135deg, var(--warning) 0%, #ea580c 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .temp-value.critical {
+            background: linear-gradient(135deg, var(--danger) 0%, #b91c1c 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: tempPulse 0.5s infinite;
+        }
+
+        @keyframes tempPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .temp-label {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        .temp-sensors {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .sensor-item {
+            text-align: center;
+        }
+
+        .sensor-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .sensor-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Door Status */
+        .door-status {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+        }
+
+        .door-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            transition: all 0.3s;
+        }
+
+        .door-icon.closed {
+            background: linear-gradient(135deg, var(--success), #16a34a);
+        }
+
+        .door-icon.open {
+            background: linear-gradient(135deg, var(--warning), #ea580c);
+            animation: doorPulse 1s infinite;
+        }
+
+        @keyframes doorPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .door-info h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .door-info p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .stat-item {
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Map */
+        .map-container {
+            height: 200px;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .map-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            filter: grayscale(30%) contrast(1.1);
+        }
+
+        .map-overlay {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: rgba(15, 23, 42, 0.9);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+        }
+
+        /* Config Form */
+        .config-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .form-group input, .form-group select {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .toggle-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toggle-label {
+            font-size: 0.875rem;
+        }
+
+        .toggle {
+            width: 48px;
+            height: 28px;
+            background: var(--bg-primary);
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .toggle.active {
+            background: var(--accent-blue);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.2s;
+        }
+
+        .toggle.active::after {
+            transform: translateX(20px);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 14px 24px;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #16a34a);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #b91c1c);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-outline:hover {
+            background: var(--bg-hover);
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
+        /* History Chart */
+        .chart-container {
+            height: 200px;
+            position: relative;
+        }
+
+        .chart-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-primary);
+            padding: 4px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: var(--bg-hover);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .header-content {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .temp-value {
+                font-size: 4rem;
+            }
+
+            .alert-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .alert-actions {
+                margin-left: 0;
+                margin-top: 16px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* RIFT Card Animation */
+        .rift-visual {
+            position: relative;
+            height: 120px;
+            background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .rift-box {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 60px;
+            background: linear-gradient(135deg, #475569, #334155);
+            border-radius: 8px;
+            border: 2px solid #64748b;
+        }
+
+        .rift-door {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            background: #1e293b;
+            border-radius: 4px;
+            transform-origin: left center;
+            transition: transform 0.5s ease;
+        }
+
+        .rift-door.open {
+            transform: perspective(100px) rotateY(-45deg);
+        }
+
+        .rift-cold {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(0deg, rgba(6, 182, 212, 0.3) 0%, transparent 100%);
+        }
+
+        .snowflakes {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        .snowflake {
+            position: absolute;
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(120px) rotate(360deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🏔️</div>
+                <div class="logo-text">
+                    <h1>PARAMETICAN SILVER</h1>
+                    <span>Sistema de Monitoreo RIFT</span>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Conectando...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Alert Banner -->
+    <div class="container">
+        <div class="alert-banner" id="alertBanner">
+            <div class="alert-content">
+                <div class="alert-icon">🚨</div>
+                <div class="alert-text">
+                    <h2>ALERTA ACTIVA</h2>
+                    <p id="alertMessage">Temperatura fuera de rango</p>
+                </div>
+                <div class="alert-actions">
+                    <button class="btn-silence" onclick="acknowledgeAlert()">
+                        🔇 SILENCIAR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="container">
+        <div class="grid">
+            <!-- Temperature Card -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>🌡️</span> Temperatura
+                    </div>
+                    <span id="tempStatus" style="color: var(--success); font-size: 0.75rem;">● Normal</span>
+                </div>
+                <div class="card-body">
+                    <div class="temp-display">
+                        <div class="temp-value" id="tempValue">--</div>
+                        <div class="temp-label">Temperatura Promedio</div>
+                        <div class="temp-sensors">
+                            <div class="sensor-item">
+                                <div class="sensor-value" id="temp1">--</div>
+                                <div class="sensor-label">Sensor 1</div>
+                            </div>
+                            <div class="sensor-item">
+                                <div class="sensor-value" id="temp2">--</div>
+                                <div class="sensor-label">Sensor 2</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIFT Visual Card -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>📦</span> RIFT-01
+                    </div>
+                    <span id="riftStatus" style="color: var(--success); font-size: 0.75rem;">● Online</span>
+                </div>
+                <div class="card-body">
+                    <div class="rift-visual">
+                        <div class="snowflakes" id="snowflakes"></div>
+                        <div class="rift-cold"></div>
+                        <div class="rift-box">
+                            <div class="rift-door" id="riftDoor"></div>
+                        </div>
+                    </div>
+                    <div class="door-status">
+                        <div class="door-icon closed" id="doorIcon">🚪</div>
+                        <div class="door-info">
+                            <h3 id="doorText">Puerta Cerrada</h3>
+                            <p id="doorTime">--</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Card -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>📊</span> Estado del Sistema
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="statUptime">--</div>
+                            <div class="stat-label">Uptime</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="statAlerts">0</div>
+                            <div class="stat-label">Alertas Totales</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="statWifi">--</div>
+                            <div class="stat-label">Señal WiFi</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="statInternet">--</div>
+                            <div class="stat-label">Internet</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Card -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>📍</span> Ubicación
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="map-container">
+                        <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-66.68,-48.15,-66.62,-48.11&layer=mapnik&marker=-48.130438,-66.652895"></iframe>
+                        <div class="map-overlay">
+                            <strong>Cerro Moro</strong><br>
+                            Santa Cruz, Argentina
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Config Card -->
+            <div class="card fade-in grid-full">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>⚙️</span> Configuración
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="tabs">
+                        <div class="tab active" onclick="showTab('umbrales')">Umbrales</div>
+                        <div class="tab" onclick="showTab('alertas')">Alertas</div>
+                        <div class="tab" onclick="showTab('acciones')">Acciones</div>
+                    </div>
+
+                    <div id="tabUmbrales" class="config-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Temperatura Máxima (°C)</label>
+                                <input type="number" id="cfgTempMax" value="-18" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Temperatura Crítica (°C)</label>
+                                <input type="number" id="cfgTempCrit" value="-10" step="0.5">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Delay Alerta (segundos)</label>
+                                <input type="number" id="cfgAlertDelay" value="300">
+                            </div>
+                            <div class="form-group">
+                                <label>Máx. Puerta Abierta (seg)</label>
+                                <input type="number" id="cfgDoorMax" value="180">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-block" onclick="saveConfig()">
+                            💾 Guardar Configuración
+                        </button>
+                    </div>
+
+                    <div id="tabAlertas" class="config-form" style="display:none">
+                        <div class="toggle-group">
+                            <span class="toggle-label">🔔 Relay (Sirena/Luz)</span>
+                            <div class="toggle active" id="toggleRelay" onclick="toggleSetting('relay')"></div>
+                        </div>
+                        <div class="toggle-group">
+                            <span class="toggle-label">🔊 Buzzer</span>
+                            <div class="toggle active" id="toggleBuzzer" onclick="toggleSetting('buzzer')"></div>
+                        </div>
+                        <div class="toggle-group">
+                            <span class="toggle-label">📱 Telegram</span>
+                            <div class="toggle active" id="toggleTelegram" onclick="toggleSetting('telegram')"></div>
+                        </div>
+                    </div>
+
+                    <div id="tabAcciones" class="config-form" style="display:none">
+                        <button class="btn btn-outline btn-block" onclick="testAlert()">
+                            🧪 Probar Alerta
+                        </button>
+                        <button class="btn btn-outline btn-block" onclick="toggleRelay()">
+                            💡 Toggle Relay Manual
+                        </button>
+                        <button class="btn btn-danger btn-block" onclick="acknowledgeAlert()">
+                            🔇 Silenciar Alarma Activa
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Campamento Parametican Silver • Cerro Moro, Santa Cruz</p>
+        <p>Sistema de Monitoreo RIFT v1.0</p>
+    </footer>
+
+    <script>
+        // Estado local
+        let config = {};
+        let lastData = null;
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            createSnowflakes();
+            fetchStatus();
+            fetchConfig();
+            setInterval(fetchStatus, 5000);
+        });
+
+        // Crear copos de nieve animados
+        function createSnowflakes() {
+            const container = document.getElementById('snowflakes');
+            for (let i = 0; i < 15; i++) {
+                const flake = document.createElement('div');
+                flake.className = 'snowflake';
+                flake.innerHTML = '❄';
+                flake.style.left = Math.random() * 100 + '%';
+                flake.style.animationDuration = (2 + Math.random() * 3) + 's';
+                flake.style.animationDelay = Math.random() * 3 + 's';
+                container.appendChild(flake);
+            }
+        }
+
+        // Fetch status del ESP32
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                lastData = data;
+                updateUI(data);
+                
+                document.getElementById('statusDot').className = 'status-dot';
+                document.getElementById('statusText').textContent = 'Conectado';
+            } catch (error) {
+                document.getElementById('statusDot').className = 'status-dot offline';
+                document.getElementById('statusText').textContent = 'Sin conexión';
+            }
+        }
+
+        // Actualizar UI con datos
+        function updateUI(data) {
+            const sensor = data.sensor;
+            const system = data.system;
+
+            // Temperatura
+            const temp = sensor.temp_avg;
+            const tempEl = document.getElementById('tempValue');
+            tempEl.textContent = temp.toFixed(1) + '°';
+            
+            tempEl.className = 'temp-value';
+            if (temp > -10) {
+                tempEl.classList.add('critical');
+                document.getElementById('tempStatus').innerHTML = '● Crítico';
+                document.getElementById('tempStatus').style.color = 'var(--danger)';
+            } else if (temp > -18) {
+                tempEl.classList.add('warning');
+                document.getElementById('tempStatus').innerHTML = '● Advertencia';
+                document.getElementById('tempStatus').style.color = 'var(--warning)';
+            } else {
+                document.getElementById('tempStatus').innerHTML = '● Normal';
+                document.getElementById('tempStatus').style.color = 'var(--success)';
+            }
+
+            document.getElementById('temp1').textContent = sensor.temp1 > -100 ? sensor.temp1.toFixed(1) + '°' : '--';
+            document.getElementById('temp2').textContent = sensor.temp2 > -100 ? sensor.temp2.toFixed(1) + '°' : '--';
+
+            // Puerta
+            const doorOpen = sensor.door_open;
+            const doorIcon = document.getElementById('doorIcon');
+            const doorText = document.getElementById('doorText');
+            const doorTime = document.getElementById('doorTime');
+            const riftDoor = document.getElementById('riftDoor');
+
+            if (doorOpen) {
+                doorIcon.className = 'door-icon open';
+                doorIcon.textContent = '🚪';
+                doorText.textContent = 'Puerta Abierta';
+                doorTime.textContent = `Hace ${sensor.door_open_sec} segundos`;
+                riftDoor.classList.add('open');
+            } else {
+                doorIcon.className = 'door-icon closed';
+                doorIcon.textContent = '🔒';
+                doorText.textContent = 'Puerta Cerrada';
+                doorTime.textContent = 'Asegurada';
+                riftDoor.classList.remove('open');
+            }
+
+            // Stats
+            const uptime = system.uptime_sec;
+            const hours = Math.floor(uptime / 3600);
+            const mins = Math.floor((uptime % 3600) / 60);
+            document.getElementById('statUptime').textContent = `${hours}h ${mins}m`;
+            document.getElementById('statAlerts').textContent = system.total_alerts;
+            document.getElementById('statWifi').textContent = system.wifi_rssi + ' dBm';
+            document.getElementById('statInternet').textContent = system.internet ? '✓ Sí' : '✗ No';
+
+            // Alerta
+            const alertBanner = document.getElementById('alertBanner');
+            if (system.alert_active) {
+                alertBanner.classList.add('active');
+                document.getElementById('alertMessage').textContent = system.alert_message;
+            } else {
+                alertBanner.classList.remove('active');
+            }
+        }
+
+        // Fetch configuración
+        async function fetchConfig() {
+            try {
+                const response = await fetch('/api/config');
+                config = await response.json();
+                
+                document.getElementById('cfgTempMax').value = config.temp_max;
+                document.getElementById('cfgTempCrit').value = config.temp_critical;
+                document.getElementById('cfgAlertDelay').value = config.alert_delay_sec;
+                document.getElementById('cfgDoorMax').value = config.door_open_max_sec;
+                
+                updateToggle('toggleRelay', config.relay_enabled);
+                updateToggle('toggleBuzzer', config.buzzer_enabled);
+                updateToggle('toggleTelegram', config.telegram_enabled);
+            } catch (error) {
+                console.error('Error fetching config:', error);
+            }
+        }
+
+        // Guardar configuración
+        async function saveConfig() {
+            const newConfig = {
+                temp_max: parseFloat(document.getElementById('cfgTempMax').value),
+                temp_critical: parseFloat(document.getElementById('cfgTempCrit').value),
+                alert_delay_sec: parseInt(document.getElementById('cfgAlertDelay').value),
+                door_open_max_sec: parseInt(document.getElementById('cfgDoorMax').value)
+            };
+
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+                alert('✅ Configuración guardada');
+            } catch (error) {
+                alert('❌ Error al guardar');
+            }
+        }
+
+        // Toggle settings
+        function toggleSetting(setting) {
+            const toggleId = 'toggle' + setting.charAt(0).toUpperCase() + setting.slice(1);
+            const toggle = document.getElementById(toggleId);
+            const isActive = toggle.classList.toggle('active');
+            
+            const key = setting + '_enabled';
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [key]: isActive })
+            });
+        }
+
+        function updateToggle(id, value) {
+            const toggle = document.getElementById(id);
+            if (value) {
+                toggle.classList.add('active');
+            } else {
+                toggle.classList.remove('active');
+            }
+        }
+
+        // Tabs
+        function showTab(tab) {
+            document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('[id^="tab"]').forEach(t => t.style.display = 'none');
+            
+            event.target.classList.add('active');
+            document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = 'flex';
+        }
+
+        // Acciones
+        async function acknowledgeAlert() {
+            await fetch('/api/alert/ack', { method: 'POST' });
+            fetchStatus();
+        }
+
+        async function testAlert() {
+            await fetch('/api/alert/test', { method: 'POST' });
+            fetchStatus();
+        }
+
+        async function toggleRelay() {
+            const currentState = lastData?.system?.relay_on || false;
+            await fetch('/api/relay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ on: !currentState })
+            });
+            fetchStatus();
+        }
+    </script>
+</body>
+</html>

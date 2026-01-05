@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#1e293b">
+
+    <!-- Temp Max -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Temperatura Máxima (°C)"
+        android:textColor="#94a3b8"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/etTempMax"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_input"
+        android:hint="-18"
+        android:inputType="numberDecimal|numberSigned"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#475569" />
+
+    <!-- Temp Critical -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Temperatura Crítica (°C)"
+        android:textColor="#94a3b8"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/etTempCritical"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_input"
+        android:hint="-10"
+        android:inputType="numberDecimal|numberSigned"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#475569" />
+
+    <!-- Alert Delay -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Demora de Alerta (segundos)"
+        android:textColor="#94a3b8"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/etAlertDelay"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/bg_input"
+        android:hint="300"
+        android:inputType="number"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#475569" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="💡 La alerta se dispara si la temperatura supera el máximo por más tiempo que la demora configurada."
+        android:textColor="#64748b"
+        android:textSize="12sp" />
+
+</LinearLayout>

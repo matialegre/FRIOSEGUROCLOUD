@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador - Campamento Parametican Silver</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(90deg, #0f3460 0%, #533483 100%);
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 { font-size: 1.5em; }
+        .header .subtitle { color: #e94560; font-size: 0.9em; margin-top: 5px; }
+        
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .panel h3 {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        .control-group label {
+            display: block;
+            color: #aaa;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .control-group .value {
+            text-align: center;
+            font-size: 2em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .control-group .value.warning { color: #ff9800; }
+        .control-group .value.critical { color: #ff4444; }
+        
+        .btn {
+            background: linear-gradient(135deg, #e94560, #533483);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover { transform: scale(1.02); }
+        .btn.secondary { background: rgba(255,255,255,0.1); }
+        .btn.success { background: linear-gradient(135deg, #00ff88, #00aa55); }
+        .btn.danger { background: linear-gradient(135deg, #ff4444, #cc0000); }
+        
+        .door-toggle {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .door-toggle button {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .door-toggle button.closed {
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+        }
+        
+        .door-toggle button.open {
+            background: rgba(255, 152, 0, 0.1);
+            color: #ff9800;
+        }
+        
+        .door-toggle button.active {
+            border-color: currentColor;
+            transform: scale(1.05);
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+        }
+        
+        .status-dot.active { background: #00ff88; animation: pulse 1s infinite; }
+        .status-dot.warning { background: #ff9800; }
+        .status-dot.error { background: #ff4444; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .log-container {
+            background: #0a0a15;
+            border-radius: 8px;
+            padding: 15px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+        
+        .log-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .log-entry.info { color: #00d4ff; }
+        .log-entry.success { color: #00ff88; }
+        .log-entry.warning { color: #ff9800; }
+        .log-entry.error { color: #ff4444; }
+        
+        .rifts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        
+        .rift-card {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .rift-card.alert {
+            border-color: #e94560;
+            animation: alertPulse 1s infinite;
+        }
+        
+        @keyframes alertPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.4); }
+            50% { box-shadow: 0 0 15px 5px rgba(233, 69, 96, 0.2); }
+        }
+        
+        .rift-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .rift-name { font-weight: bold; }
+        
+        .rift-status {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+        
+        .rift-status.online { background: #00ff88; color: #000; }
+        .rift-status.offline { background: #666; }
+        
+        .rift-temp {
+            font-size: 2.5em;
+            font-weight: bold;
+            text-align: center;
+            padding: 15px 0;
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .rift-temp.warning {
+            background: linear-gradient(135deg, #ff9800, #ff5722);
+            -webkit-background-clip: text;
+        }
+        
+        .rift-temp.critical {
+            background: linear-gradient(135deg, #ff4444, #cc0000);
+            -webkit-background-clip: text;
+        }
+        
+        .rift-temp.offline {
+            background: #666;
+            -webkit-background-clip: text;
+        }
+        
+        .rift-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #888;
+            margin-top: 10px;
+        }
+        
+        .rift-door {
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
+        .rift-door.closed { background: rgba(0,255,136,0.1); color: #00ff88; }
+        .rift-door.open { background: rgba(255,152,0,0.2); color: #ff9800; }
+        
+        .map-container {
+            margin-top: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .map-container iframe {
+            width: 100%;
+            height: 250px;
+            border: none;
+        }
+        
+        .alerts-container {
+            margin-top: 20px;
+        }
+        
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: rgba(233, 69, 96, 0.1);
+            border: 1px solid #e94560;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .alert-icon { font-size: 1.5em; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .stat-item {
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #00d4ff; }
+        .stat-label { font-size: 0.8em; color: #888; }
+        
+        .rift-selector {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .rift-selector button {
+            padding: 8px 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.2);
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .rift-selector button.active {
+            background: #e94560;
+            border-color: #e94560;
+        }
+        
+        .rift-selector button:hover:not(.active) {
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 SIMULADOR - Campamento Parametican Silver</h1>
+        <div class="subtitle">Prueba el sistema sin hardware real</div>
+    </div>
+    
+    <div class="container">
+        <div class="main-grid">
+            <!-- Panel de Control -->
+            <div class="panel">
+                <h3>🎮 Control del Emisor</h3>
+                
+                <div class="rift-selector" id="riftSelector">
+                    <button class="active" data-rift="1">RIFT-01</button>
+                    <button data-rift="2">RIFT-02</button>
+                    <button data-rift="3">RIFT-03</button>
+                    <button data-rift="4">RIFT-04</button>
+                    <button data-rift="5">RIFT-05</button>
+                    <button data-rift="6">RIFT-06</button>
+                </div>
+                
+                <div class="status-indicator">
+                    <div class="status-dot" id="emitterStatus"></div>
+                    <span id="emitterStatusText">Emisor detenido</span>
+                </div>
+                
+                <div class="control-group">
+                    <label>🌡️ Temperatura Sensor 1</label>
+                    <input type="range" id="temp1Slider" min="-40" max="20" value="-25" step="0.5">
+                    <div class="value" id="temp1Value">-25.0°C</div>
+                </div>
+                
+                <div class="control-group">
+                    <label>🌡️ Temperatura Sensor 2</label>
+                    <input type="range" id="temp2Slider" min="-40" max="20" value="-24" step="0.5">
+                    <div class="value" id="temp2Value">-24.0°C</div>
+                </div>
+                
+                <div class="control-group">
+                    <label>🚪 Estado de Puerta</label>
+                    <div class="door-toggle">
+                        <button class="closed active" id="doorClosed" onclick="setDoor(false)">🔒 Cerrada</button>
+                        <button class="open" id="doorOpen" onclick="setDoor(true)">🚪 Abierta</button>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>📶 Señal WiFi (RSSI)</label>
+                    <input type="range" id="rssiSlider" min="-90" max="-30" value="-65">
+                    <div style="text-align:center;color:#888" id="rssiValue">-65 dBm</div>
+                </div>
+                
+                <button class="btn success" id="startBtn" onclick="toggleEmitter()">
+                    ▶️ Iniciar Emisor
+                </button>
+                
+                <button class="btn secondary" onclick="simulateScenario('normal')">
+                    📊 Escenario Normal
+                </button>
+                
+                <button class="btn secondary" onclick="simulateScenario('doorOpen')">
+                    🚪 Simular Apertura Puerta
+                </button>
+                
+                <button class="btn danger" onclick="simulateScenario('failure')">
+                    ⚠️ Simular Falla de Frío
+                </button>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="statSent">0</div>
+                        <div class="stat-label">Enviados</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statAlerts">0</div>
+                        <div class="stat-label">Alertas</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-top:20px">📋 Log de Actividad</h3>
+                <div class="log-container" id="logContainer"></div>
+            </div>
+            
+            <!-- Panel de Visualización -->
+            <div>
+                <div class="panel">
+                    <h3>📊 Dashboard - Vista del Receptor</h3>
+                    
+                    <div class="alerts-container" id="alertsContainer"></div>
+                    
+                    <div class="rifts-grid" id="riftsGrid"></div>
+                    
+                    <div class="map-container">
+                        <iframe 
+                            src="https://www.openstreetmap.org/export/embed.html?bbox=-66.68,-48.15,-66.62,-48.11&layer=mapnik&marker=-48.130438,-66.652895">
+                        </iframe>
+                    </div>
+                </div>
+                
+                <div class="panel" style="margin-top:20px">
+                    <h3>⚙️ Configuración de Umbrales</h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px">
+                        <div class="control-group">
+                            <label>Temp. Máxima</label>
+                            <input type="number" id="thresholdMax" value="-18" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:6px;color:#fff">
+                        </div>
+                        <div class="control-group">
+                            <label>Temp. Crítica</label>
+                            <input type="number" id="thresholdCrit" value="-10" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:6px;color:#fff">
+                        </div>
+                        <div class="control-group">
+                            <label>Delay Alerta (seg)</label>
+                            <input type="number" id="thresholdDelay" value="300" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:6px;color:#fff">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Estado del sistema
+        const state = {
+            running: false,
+            selectedRift: 1,
+            interval: null,
+            sentCount: 0,
+            alertCount: 0,
+            rifts: {}
+        };
+        
+        // Inicializar RIFTs
+        const riftNames = ['Deposito Principal', 'Deposito Carnes', 'Deposito Lacteos', 
+                          'Deposito Verduras', 'Deposito Bebidas', 'Deposito Reserva'];
+        
+        for (let i = 1; i <= 6; i++) {
+            state.rifts[i] = {
+                id: i,
+                name: `RIFT-0${i}`,
+                location: riftNames[i-1],
+                temp1: -25,
+                temp2: -24,
+                tempAvg: -24.5,
+                doorOpen: false,
+                doorOpenSince: 0,
+                online: false,
+                rssi: -65,
+                alertActive: false,
+                alertMessage: '',
+                lastUpdate: 0,
+                highTempStart: 0
+            };
+        }
+        
+        // Configuración
+        const config = {
+            tempMax: -18,
+            tempCrit: -10,
+            minDuration: 300,
+            doorMax: 180
+        };
+        
+        // Inicializar UI
+        document.addEventListener('DOMContentLoaded', () => {
+            setupSliders();
+            setupRiftSelector();
+            renderRifts();
+            updateConfig();
+        });
+        
+        function setupSliders() {
+            const temp1 = document.getElementById('temp1Slider');
+            const temp2 = document.getElementById('temp2Slider');
+            const rssi = document.getElementById('rssiSlider');
+            
+            temp1.oninput = () => updateTempDisplay(1, temp1.value);
+            temp2.oninput = () => updateTempDisplay(2, temp2.value);
+            rssi.oninput = () => {
+                document.getElementById('rssiValue').textContent = rssi.value + ' dBm';
+            };
+        }
+        
+        function updateTempDisplay(sensor, value) {
+            const el = document.getElementById(`temp${sensor}Value`);
+            el.textContent = parseFloat(value).toFixed(1) + '°C';
+            
+            const tempMax = parseFloat(document.getElementById('thresholdMax').value);
+            const tempCrit = parseFloat(document.getElementById('thresholdCrit').value);
+            
+            el.className = 'value';
+            if (value > tempCrit) el.classList.add('critical');
+            else if (value > tempMax) el.classList.add('warning');
+        }
+        
+        function setupRiftSelector() {
+            document.querySelectorAll('.rift-selector button').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.rift-selector button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.selectedRift = parseInt(btn.dataset.rift);
+                    loadRiftToControls(state.selectedRift);
+                };
+            });
+        }
+        
+        function loadRiftToControls(riftId) {
+            const rift = state.rifts[riftId];
+            document.getElementById('temp1Slider').value = rift.temp1;
+            document.getElementById('temp2Slider').value = rift.temp2;
+            document.getElementById('rssiSlider').value = rift.rssi;
+            updateTempDisplay(1, rift.temp1);
+            updateTempDisplay(2, rift.temp2);
+            document.getElementById('rssiValue').textContent = rift.rssi + ' dBm';
+            setDoor(rift.doorOpen, false);
+        }
+        
+        function setDoor(open, updateState = true) {
+            document.getElementById('doorClosed').classList.toggle('active', !open);
+            document.getElementById('doorOpen').classList.toggle('active', open);
+            
+            if (updateState) {
+                const rift = state.rifts[state.selectedRift];
+                if (open && !rift.doorOpen) {
+                    rift.doorOpenSince = Date.now();
+                } else if (!open) {
+                    rift.doorOpenSince = 0;
+                }
+                rift.doorOpen = open;
+            }
+        }
+        
+        function toggleEmitter() {
+            state.running = !state.running;
+            const btn = document.getElementById('startBtn');
+            const status = document.getElementById('emitterStatus');
+            const statusText = document.getElementById('emitterStatusText');
+            
+            if (state.running) {
+                btn.textContent = '⏹️ Detener Emisor';
+                btn.classList.remove('success');
+                btn.classList.add('danger');
+                status.classList.add('active');
+                statusText.textContent = 'Emisor activo - enviando cada 3s';
+                
+                state.interval = setInterval(sendData, 3000);
+                sendData(); // Enviar inmediatamente
+                log('Emisor iniciado', 'success');
+            } else {
+                btn.textContent = '▶️ Iniciar Emisor';
+                btn.classList.remove('danger');
+                btn.classList.add('success');
+                status.classList.remove('active');
+                statusText.textContent = 'Emisor detenido';
+                
+                clearInterval(state.interval);
+                log('Emisor detenido', 'warning');
+            }
+        }
+        
+        function sendData() {
+            const riftId = state.selectedRift;
+            const rift = state.rifts[riftId];
+            
+            // Leer valores de los controles
+            rift.temp1 = parseFloat(document.getElementById('temp1Slider').value);
+            rift.temp2 = parseFloat(document.getElementById('temp2Slider').value);
+            rift.tempAvg = (rift.temp1 + rift.temp2) / 2;
+            rift.rssi = parseInt(document.getElementById('rssiSlider').value);
+            rift.online = true;
+            rift.lastUpdate = Date.now();
+            
+            // Calcular tiempo puerta abierta
+            if (rift.doorOpen && rift.doorOpenSince > 0) {
+                rift.doorOpenSince = Math.floor((Date.now() - rift.doorOpenSince) / 1000);
+            }
+            
+            state.sentCount++;
+            document.getElementById('statSent').textContent = state.sentCount;
+            
+            log(`[RIFT-0${riftId}] Temp: ${rift.tempAvg.toFixed(1)}°C | Puerta: ${rift.doorOpen ? 'ABIERTA' : 'Cerrada'}`, 'info');
+            
+            // Verificar alertas
+            checkAlerts(riftId);
+            
+            // Actualizar UI
+            renderRifts();
+        }
+        
+        function checkAlerts(riftId) {
+            const rift = state.rifts[riftId];
+            const tempMax = parseFloat(document.getElementById('thresholdMax').value);
+            const tempCrit = parseFloat(document.getElementById('thresholdCrit').value);
+            const minDuration = parseInt(document.getElementById('thresholdDelay').value);
+            
+            // Alerta crítica inmediata
+            if (rift.tempAvg > tempCrit) {
+                if (!rift.alertActive) {
+                    triggerAlert(riftId, `🚨 CRÍTICO: Temperatura ${rift.tempAvg.toFixed(1)}°C`);
+                }
+                return;
+            }
+            
+            // Alerta normal con delay
+            if (rift.tempAvg > tempMax) {
+                if (rift.doorOpen) {
+                    // Puerta abierta, no alertar por temperatura
+                    log(`[RIFT-0${riftId}] Temp alta pero puerta abierta - ignorando`, 'warning');
+                } else {
+                    if (rift.highTempStart === 0) {
+                        rift.highTempStart = Date.now();
+                        log(`[RIFT-0${riftId}] Temp alta detectada, iniciando timer`, 'warning');
+                    } else {
+                        const elapsed = (Date.now() - rift.highTempStart) / 1000;
+                        if (elapsed > minDuration && !rift.alertActive) {
+                            triggerAlert(riftId, `⚠️ Temperatura alta sostenida: ${rift.tempAvg.toFixed(1)}°C`);
+                        }
+                    }
+                }
+            } else {
+                // Temperatura normal
+                rift.highTempStart = 0;
+                if (rift.alertActive) {
+                    clearAlert(riftId);
+                }
+            }
+        }
+        
+        function triggerAlert(riftId, message) {
+            const rift = state.rifts[riftId];
+            rift.alertActive = true;
+            rift.alertMessage = message;
+            
+            state.alertCount++;
+            document.getElementById('statAlerts').textContent = state.alertCount;
+            
+            log(`[ALERTA] ${rift.name}: ${message}`, 'error');
+            
+            // Simular notificación
+            if (Notification.permission === 'granted') {
+                new Notification('Alerta Parametican Silver', { body: `${rift.name}: ${message}` });
+            }
+        }
+        
+        function clearAlert(riftId) {
+            const rift = state.rifts[riftId];
+            rift.alertActive = false;
+            rift.alertMessage = '';
+            log(`[RIFT-0${riftId}] Alerta resuelta - temperatura normalizada`, 'success');
+        }
+        
+        function renderRifts() {
+            const grid = document.getElementById('riftsGrid');
+            const alertsContainer = document.getElementById('alertsContainer');
+            
+            let riftsHtml = '';
+            let alertsHtml = '';
+            
+            for (let i = 1; i <= 6; i++) {
+                const rift = state.rifts[i];
+                const tempClass = getTempClass(rift.tempAvg, rift.online);
+                const cardClass = rift.alertActive ? 'rift-card alert' : 'rift-card';
+                
+                riftsHtml += `
+                    <div class="${cardClass}">
+                        <div class="rift-header">
+                            <span class="rift-name">${rift.name}</span>
+                            <span class="rift-status ${rift.online ? 'online' : 'offline'}">
+                                ${rift.online ? 'ONLINE' : 'OFFLINE'}
+                            </span>
+                        </div>
+                        <div class="rift-temp ${tempClass}">
+                            ${rift.online ? rift.tempAvg.toFixed(1) + '°C' : '--'}
+                        </div>
+                        <div class="rift-info">
+                            <span>${rift.location}</span>
+                            <span>${rift.online ? rift.rssi + ' dBm' : ''}</span>
+                        </div>
+                        <div class="rift-door ${rift.doorOpen ? 'open' : 'closed'}">
+                            ${rift.doorOpen ? '🚪 PUERTA ABIERTA' : '🔒 Puerta Cerrada'}
+                            ${rift.doorOpen && rift.doorOpenSince > 0 ? ` (${rift.doorOpenSince}s)` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                if (rift.alertActive) {
+                    alertsHtml += `
+                        <div class="alert-item">
+                            <span class="alert-icon">🚨</span>
+                            <div>
+                                <strong>${rift.name}</strong> - ${rift.location}<br>
+                                <span style="color:#aaa">${rift.alertMessage}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            grid.innerHTML = riftsHtml;
+            alertsContainer.innerHTML = alertsHtml;
+        }
+        
+        function getTempClass(temp, online) {
+            if (!online) return 'offline';
+            const tempCrit = parseFloat(document.getElementById('thresholdCrit').value);
+            const tempMax = parseFloat(document.getElementById('thresholdMax').value);
+            if (temp > tempCrit) return 'critical';
+            if (temp > tempMax) return 'warning';
+            return '';
+        }
+        
+        function log(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString();
+            container.innerHTML = `<div class="log-entry ${type}">[${time}] ${message}</div>` + container.innerHTML;
+            
+            // Limitar a 50 entradas
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        function simulateScenario(scenario) {
+            const rift = state.rifts[state.selectedRift];
+            
+            switch (scenario) {
+                case 'normal':
+                    document.getElementById('temp1Slider').value = -25;
+                    document.getElementById('temp2Slider').value = -24;
+                    updateTempDisplay(1, -25);
+                    updateTempDisplay(2, -24);
+                    setDoor(false);
+                    log('Escenario: Operación normal', 'success');
+                    break;
+                    
+                case 'doorOpen':
+                    setDoor(true);
+                    // Simular subida gradual de temperatura
+                    let temp = parseFloat(document.getElementById('temp1Slider').value);
+                    const doorInterval = setInterval(() => {
+                        if (!state.rifts[state.selectedRift].doorOpen || temp >= -10) {
+                            clearInterval(doorInterval);
+                            return;
+                        }
+                        temp += 0.5;
+                        document.getElementById('temp1Slider').value = temp;
+                        document.getElementById('temp2Slider').value = temp + 1;
+                        updateTempDisplay(1, temp);
+                        updateTempDisplay(2, temp + 1);
+                    }, 500);
+                    log('Escenario: Puerta abierta - temperatura subiendo', 'warning');
+                    break;
+                    
+                case 'failure':
+                    setDoor(false);
+                    document.getElementById('temp1Slider').value = -5;
+                    document.getElementById('temp2Slider').value = -4;
+                    updateTempDisplay(1, -5);
+                    updateTempDisplay(2, -4);
+                    log('Escenario: Falla de refrigeración - ALERTA!', 'error');
+                    break;
+            }
+        }
+        
+        function updateConfig() {
+            document.getElementById('thresholdMax').onchange = () => renderRifts();
+            document.getElementById('thresholdCrit').onchange = () => renderRifts();
+        }
+        
+        // Solicitar permiso de notificaciones
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+        
+        // Renderizar inicial
+        renderRifts();
+        log('Simulador iniciado - Campamento Parametican Silver', 'success');
+        log('Selecciona un RIFT y presiona "Iniciar Emisor"', 'info');
+    </script>
+</body>
+</html>
