@@ -336,8 +336,8 @@ class MainActivity : AppCompatActivity() {
                 val supabaseUrl = ModeSelectActivity.SUPABASE_URL
                 val supabaseKey = ModeSelectActivity.SUPABASE_KEY
                 
-                // Obtener TODOS los dispositivos
-                val devicesUrl = URL("$supabaseUrl/rest/v1/devices?select=*&order=device_id")
+                // Obtener SOLO dispositivos REEFER (no CARNICERIA)
+                val devicesUrl = URL("$supabaseUrl/rest/v1/devices?device_id=like.REEFER*&select=*&order=device_id")
                 val devConn = devicesUrl.openConnection() as HttpURLConnection
                 devConn.connectTimeout = 10000
                 devConn.setRequestProperty("apikey", supabaseKey)
@@ -349,8 +349,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 devConn.disconnect()
                 
-                // Obtener últimas lecturas de todos los dispositivos
-                val readingsUrl = URL("$supabaseUrl/rest/v1/readings?select=device_id,temp_avg,temp1,temp2,door_open,siren_on,alert_active,created_at&order=created_at.desc&limit=50")
+                // Obtener últimas lecturas solo de REEFER
+                val readingsUrl = URL("$supabaseUrl/rest/v1/readings?device_id=like.REEFER*&select=device_id,temp_avg,temp1,temp2,door_open,siren_on,alert_active,created_at&order=created_at.desc&limit=50")
                 val readConn = readingsUrl.openConnection() as HttpURLConnection
                 readConn.connectTimeout = 10000
                 readConn.setRequestProperty("apikey", supabaseKey)
