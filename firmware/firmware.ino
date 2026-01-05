@@ -121,6 +121,10 @@ bool appConnected = false;
 int androidConnections = 0;  // Contador de conexiones Android activas
 unsigned long lastAndroidPing = 0;
 
+// Variables para alertas
+bool telegramAlertSent = false;
+bool manualAlert = false;  // Alertas manuales no se auto-desactivan
+
 // ============================================
 // SETUP
 // ============================================
@@ -525,11 +529,6 @@ void checkAlerts() {
     }
   }
 }
-
-// Variable para trackear si ya se envió alerta a Telegram en esta sesión de alerta
-bool telegramAlertSent = false;
-// Variable para alertas manuales (no se auto-desactivan)
-bool manualAlert = false;
 
 void triggerAlert(String message, bool critical) {
   // Si ya hay una alerta activa, no hacer nada (evita spam)
