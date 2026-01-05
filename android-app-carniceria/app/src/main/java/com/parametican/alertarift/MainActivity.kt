@@ -51,16 +51,17 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
     
-    // 6 Reefers data
-    data class ReeferInfo(val id: String, val name: String, var online: Boolean, var temp: Float, var alertActive: Boolean)
-    private val reefers = mutableListOf(
-        ReeferInfo("REEFER-01", "Reefer Principal", true, -22.5f, false),
-        ReeferInfo("REEFER-02", "Reefer Carnes", false, -20.0f, false),
-        ReeferInfo("REEFER-03", "Reefer Lácteos", false, -18.5f, false),
-        ReeferInfo("REEFER-04", "Reefer Verduras", false, -15.0f, false),
-        ReeferInfo("REEFER-05", "Reefer Bebidas", false, -5.0f, false),
-        ReeferInfo("REEFER-06", "Reefer Backup", false, -25.0f, false)
+    // Reefers data
+    data class ReeferInfo(
+        val id: String, 
+        val name: String, 
+        var online: Boolean, 
+        var temp: Float, 
+        var alertActive: Boolean,
+        var doorOpen: Boolean = false,
+        var sirenOn: Boolean = false
     )
+    private val reefers = mutableListOf<ReeferInfo>()
 
     private val dataReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -316,58 +317,109 @@ class MainActivity : AppCompatActivity() {
     private fun fetchFromSupabase(orgSlug: String) {
         thread {
             try {
-                val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-                val supabaseUrl = prefs.getString("supabase_url", ModeSelectActivity.SUPABASE_URL)
-                val supabaseKey = prefs.getString("supabase_key", ModeSelectActivity.SUPABASE_KEY)
+                val supabaseUrl = ModeSelectActivity.SUPABASE_URL
+                val supabaseKey = ModeSelectActivity.SUPABASE_KEY
                 
-                // Obtener dispositivos con últimas lecturas
-                val url = URL("$supabaseUrl/rest/v1/devices?org_slug=eq.$orgSlug&select=*")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 10000
-                conn.setRequestProperty("apikey", supabaseKey)
-                conn.setRequestProperty("Authorization", "Bearer $supabaseKey")
+                // Primero obtener dispositivos
+                val devicesUrl = URL("$supabaseUrl/rest/v1/devices?org_slug=eq.$orgSlug&select=*")
+                val devConn = devicesUrl.openConnection() as HttpURLConnection
+                devConn.connectTimeout = 10000
+                devConn.setRequestProperty("apikey", supabaseKey)
+                devConn.setRequestProperty("Authorization", "Bearer $supabaseKey")
                 
-                if (conn.responseCode == 200) {
-                    val response = conn.inputStream.bufferedReader().readText()
-                    runOnUiThread {
-                        parseAndUpdateDevices(response)
-                        tvLastUpdate.text = "Última actualización: ${java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date())}"
-                    }
+                var devicesJson = "[]"
+                if (devConn.responseCode == 200) {
+                    devicesJson = devConn.inputStream.bufferedReader().readText()
                 }
-                conn.disconnect()
+                devConn.disconnect()
+                
+                // Luego obtener últimas lecturas
+                val readingsUrl = URL("$supabaseUrl/rest/v1/readings?select=device_id,temp_avg,temp1,temp2,door_open,siren_on,alert_active,created_at&order=created_at.desc&limit=20")
+                val readConn = readingsUrl.openConnection() as HttpURLConnection
+                readConn.connectTimeout = 10000
+                readConn.setRequestProperty("apikey", supabaseKey)
+                readConn.setRequestProperty("Authorization", "Bearer $supabaseKey")
+                
+                var readingsJson = "[]"
+                if (readConn.responseCode == 200) {
+                    readingsJson = readConn.inputStream.bufferedReader().readText()
+                }
+                readConn.disconnect()
+                
+                runOnUiThread {
+                    parseSupabaseData(devicesJson, readingsJson)
+                    tvLastUpdate.text = "Última actualización: ${java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date())}"
+                }
             } catch (e: Exception) {
                 runOnUiThread {
-                    tvConnectionStatus.text = "⚠️ Error de conexión"
+                    tvConnectionStatus.text = "⚠️ Error: ${e.message}"
                     tvConnectionStatus.setTextColor(Color.parseColor("#f59e0b"))
                 }
             }
         }
     }
     
-    private fun parseAndUpdateDevices(json: String) {
+    private fun parseSupabaseData(devicesJson: String, readingsJson: String) {
         try {
-            // Parseo simple del JSON
-            val devices = org.json.JSONArray(json)
-            for (i in 0 until devices.length()) {
-                val device = devices.getJSONObject(i)
-                val deviceId = device.getString("device_id")
-                val isOnline = device.optBoolean("is_online", false)
-                val lastTemp = device.optDouble("last_temp", -999.0).toFloat()
-                
-                // Actualizar reefer correspondiente
-                reefers.find { it.id == deviceId }?.apply {
-                    online = isOnline
-                    if (lastTemp > -900) temp = lastTemp
+            val devices = org.json.JSONArray(devicesJson)
+            val readings = org.json.JSONArray(readingsJson)
+            
+            // Crear mapa de últimas lecturas por device_id
+            val latestReadings = mutableMapOf<String, org.json.JSONObject>()
+            for (i in 0 until readings.length()) {
+                val reading = readings.getJSONObject(i)
+                val deviceId = reading.optString("device_id", "")
+                if (deviceId.isNotEmpty() && !latestReadings.containsKey(deviceId)) {
+                    latestReadings[deviceId] = reading
                 }
             }
+            
+            // Limpiar y reconstruir lista de reefers
+            reefers.clear()
+            
+            for (i in 0 until devices.length()) {
+                val device = devices.getJSONObject(i)
+                val deviceId = device.optString("device_id", "UNKNOWN")
+                val name = device.optString("name", deviceId)
+                val isOnline = device.optBoolean("is_online", false)
+                
+                // Buscar última lectura para este dispositivo
+                val reading = latestReadings[deviceId]
+                val temp = reading?.optDouble("temp_avg", -999.0)?.toFloat() ?: -999f
+                val doorOpen = reading?.optBoolean("door_open", false) ?: false
+                val sirenOn = reading?.optBoolean("siren_on", false) ?: false
+                val alertActive = reading?.optBoolean("alert_active", false) ?: false
+                
+                reefers.add(ReeferInfo(
+                    id = deviceId,
+                    name = name,
+                    online = isOnline,
+                    temp = if (temp > -900) temp else -22.5f,
+                    alertActive = alertActive,
+                    doorOpen = doorOpen,
+                    sirenOn = sirenOn
+                ))
+            }
+            
             populateReefers()
             
-            // Actualizar display principal con el primer dispositivo online
-            reefers.firstOrNull { it.online }?.let {
+            // Actualizar display principal con el primer dispositivo online o el primero disponible
+            val mainDevice = reefers.firstOrNull { it.online } ?: reefers.firstOrNull()
+            mainDevice?.let {
                 tvTemperature.text = String.format("%.1f°C", it.temp)
+                tvDoorStatus.text = if (it.doorOpen) "Abierta" else "Cerrada"
+                tvDoorStatus.setTextColor(Color.parseColor(if (it.doorOpen) "#ef4444" else "#22c55e"))
+                // Sirena status ya se maneja en updateDisplay
+                
+                if (it.alertActive) {
+                    tvTemperature.setTextColor(Color.parseColor("#ef4444"))
+                } else {
+                    tvTemperature.setTextColor(Color.parseColor("#22d3ee"))
+                }
             }
         } catch (e: Exception) {
-            // Ignorar errores de parseo
+            // Log error pero no crashear
+            tvConnectionStatus.text = "⚠️ Error parseando datos"
         }
     }
 
