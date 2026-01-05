@@ -291,8 +291,30 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Connection Card -->
+        <!-- 6 Reefers Section - PRIMERO -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📦 Todos los Reefers"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
         <LinearLayout
+            android:id="@+id/reefersContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="12dp">
+
+            <!-- Reefer items will be added programmatically -->
+
+        </LinearLayout>
+
+        <!-- Connection Card (solo visible en modo LOCAL) -->
+        <LinearLayout
+            android:id="@+id/connectionCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -303,7 +325,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⚙️ Conexión"
+                android:text="⚙️ Conexión Local"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -374,6 +396,7 @@
 
         <!-- Control Buttons -->
         <LinearLayout
+            android:id="@+id/controlButtons"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -415,50 +438,6 @@
             android:textSize="14sp"
             android:backgroundTint="#1e293b"
             android:layout_marginBottom="8dp" />
-
-        <!-- Modo Descongelamiento -->
-        <Button
-            android:id="@+id/btnDefrost"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="🧊 MODO DESCONGELAMIENTO"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:backgroundTint="#f59e0b"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Cambiar Modo Conexión -->
-        <Button
-            android:id="@+id/btnChangeMode"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="🔄 CAMBIAR MODO CONEXIÓN"
-            android:textColor="#94a3b8"
-            android:textSize="13sp"
-            android:backgroundTint="#334155"
-            android:layout_marginBottom="12dp" />
-
-        <!-- 6 Reefers Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📦 Todos los Reefers"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <LinearLayout
-            android:id="@+id/reefersContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginBottom="12dp">
-
-            <!-- Reefer items will be added programmatically -->
-
-        </LinearLayout>
 
         <!-- Notifications Section -->
         <LinearLayout
@@ -667,6 +646,29 @@
                 android:textSize="11sp"
                 android:gravity="center" />
         </LinearLayout>
+
+        <!-- Modo Descongelamiento - AL FINAL -->
+        <Button
+            android:id="@+id/btnDefrost"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="🧊 MODO DESCONGELAMIENTO"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:backgroundTint="#f59e0b"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Cambiar Modo Conexión - AL FINAL -->
+        <Button
+            android:id="@+id/btnChangeMode"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="🔄 CAMBIAR MODO CONEXIÓN"
+            android:textColor="#94a3b8"
+            android:textSize="13sp"
+            android:backgroundTint="#334155"
+            android:layout_marginBottom="12dp" />
 
         <!-- System Info -->
         <LinearLayout

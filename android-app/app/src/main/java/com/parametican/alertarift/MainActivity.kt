@@ -45,6 +45,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var alertBanner: LinearLayout
     private lateinit var simBadge: LinearLayout
     private lateinit var reefersContainer: LinearLayout
+    private lateinit var connectionCard: LinearLayout
+    private lateinit var controlButtons: LinearLayout
 
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
@@ -119,6 +121,108 @@ class MainActivity : AppCompatActivity() {
         // Populate Reefers list
         populateReefers()
         alertBanner = findViewById(R.id.alertBanner)
+        connectionCard = findViewById(R.id.connectionCard)
+        controlButtons = findViewById(R.id.controlButtons)
+        
+        // Ocultar conexión local si está en modo Internet
+        setupConnectionMode()
+    }
+    
+    private fun setupConnectionMode() {
+        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
+        val mode = prefs.getString("connection_mode", "local")
+        
+        if (mode == "internet") {
+            // Modo Internet: ocultar campo IP y botones de inicio/detener
+            connectionCard.visibility = View.GONE
+            controlButtons.visibility = View.GONE
+            
+            // Iniciar monitoreo automáticamente desde Supabase
+            startInternetMonitoring()
+        } else {
+            // Modo Local: mostrar todo
+            connectionCard.visibility = View.VISIBLE
+            controlButtons.visibility = View.VISIBLE
+        }
+    }
+    
+    private fun startInternetMonitoring() {
+        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
+        val orgSlug = prefs.getString("org_slug", "parametican") ?: "parametican"
+        
+        tvConnectionStatus.text = "🌐 Conectado a la nube"
+        tvConnectionStatus.setTextColor(Color.parseColor("#22c55e"))
+        
+        // Iniciar polling de Supabase
+        startSupabasePolling(orgSlug)
+    }
+    
+    private fun startSupabasePolling(orgSlug: String) {
+        updateRunnable = object : Runnable {
+            override fun run() {
+                fetchFromSupabase(orgSlug)
+                handler.postDelayed(this, 5000) // Cada 5 segundos
+            }
+        }
+        handler.post(updateRunnable!!)
+    }
+    
+    private fun fetchFromSupabase(orgSlug: String) {
+        thread {
+            try {
+                val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
+                val supabaseUrl = prefs.getString("supabase_url", ModeSelectActivity.SUPABASE_URL)
+                val supabaseKey = prefs.getString("supabase_key", ModeSelectActivity.SUPABASE_KEY)
+                
+                // Obtener dispositivos con últimas lecturas
+                val url = URL("$supabaseUrl/rest/v1/devices?org_slug=eq.$orgSlug&select=*")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 10000
+                conn.setRequestProperty("apikey", supabaseKey)
+                conn.setRequestProperty("Authorization", "Bearer $supabaseKey")
+                
+                if (conn.responseCode == 200) {
+                    val response = conn.inputStream.bufferedReader().readText()
+                    runOnUiThread {
+                        parseAndUpdateDevices(response)
+                        tvLastUpdate.text = "Última actualización: ${java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date())}"
+                    }
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                runOnUiThread {
+                    tvConnectionStatus.text = "⚠️ Error de conexión"
+                    tvConnectionStatus.setTextColor(Color.parseColor("#f59e0b"))
+                }
+            }
+        }
+    }
+    
+    private fun parseAndUpdateDevices(json: String) {
+        try {
+            // Parseo simple del JSON
+            val devices = org.json.JSONArray(json)
+            for (i in 0 until devices.length()) {
+                val device = devices.getJSONObject(i)
+                val deviceId = device.getString("device_id")
+                val isOnline = device.optBoolean("is_online", false)
+                val lastTemp = device.optDouble("last_temp", -999.0).toFloat()
+                
+                // Actualizar reefer correspondiente
+                reefers.find { it.id == deviceId }?.apply {
+                    online = isOnline
+                    if (lastTemp > -900) temp = lastTemp
+                }
+            }
+            populateReefers()
+            
+            // Actualizar display principal con el primer dispositivo online
+            reefers.firstOrNull { it.online }?.let {
+                tvTemperature.text = String.format("%.1f°C", it.temp)
+            }
+        } catch (e: Exception) {
+            // Ignorar errores de parseo
+        }
     }
 
     private fun loadSavedIp() {
