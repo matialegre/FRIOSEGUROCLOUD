@@ -117,25 +117,66 @@
   top: -20px;
   left: var(--x);
   font-size: var(--size);
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, var(--opacity, 0.5));
   animation: snowfall var(--duration) linear infinite;
   animation-delay: var(--delay);
-  text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
+  filter: blur(0.5px);
 }
 
 @keyframes snowfall {
   0% {
-    transform: translateY(-20px) rotate(0deg);
+    transform: translateY(-20px) rotate(0deg) translateX(0);
     opacity: 0;
   }
   10% {
-    opacity: 1;
+    opacity: var(--opacity, 0.5);
+  }
+  50% {
+    transform: translateY(50vh) rotate(180deg) translateX(20px);
   }
   90% {
-    opacity: 0.8;
+    opacity: calc(var(--opacity, 0.5) * 0.8);
   }
   100% {
-    transform: translateY(100vh) rotate(360deg);
+    transform: translateY(100vh) rotate(360deg) translateX(-10px);
+    opacity: 0;
+  }
+}
+
+/* Copos grandes de fondo */
+.snowflakes-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.snowflake-big {
+  position: absolute;
+  top: -50px;
+  left: var(--x);
+  font-size: var(--size);
+  color: rgba(96, 165, 250, 0.15);
+  animation: snowfallSlow var(--duration) linear infinite;
+  animation-delay: var(--delay);
+  filter: blur(2px);
+}
+
+@keyframes snowfallSlow {
+  0% {
+    transform: translateY(-50px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.15;
+  }
+  90% {
+    opacity: 0.1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(180deg);
     opacity: 0;
   }
 }

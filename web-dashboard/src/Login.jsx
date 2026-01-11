@@ -34,15 +34,15 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-container">
-      {/* Partículas de fondo animadas */}
+      {/* Partículas de fondo animadas - MÁS partículas */}
       <div className="particles">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(40)].map((_, i) => (
           <div key={i} className="particle" style={{
-            '--delay': `${Math.random() * 5}s`,
-            '--duration': `${15 + Math.random() * 10}s`,
+            '--delay': `${Math.random() * 8}s`,
+            '--duration': `${12 + Math.random() * 15}s`,
             '--x-start': `${Math.random() * 100}%`,
             '--x-end': `${Math.random() * 100}%`,
-            '--size': `${4 + Math.random() * 8}px`
+            '--size': `${3 + Math.random() * 10}px`
           }} />
         ))}
       </div>
@@ -125,14 +125,27 @@ export default function Login({ onLogin }) {
         </div>
       </div>
 
-      {/* Decoración de copos de nieve */}
+      {/* Decoración de copos de nieve - MUCHOS MÁS */}
       <div className="snowflakes">
-        {[...Array(10)].map((_, i) => (
+        {[...Array(35)].map((_, i) => (
           <div key={i} className="snowflake" style={{
-            '--delay': `${Math.random() * 8}s`,
-            '--duration': `${10 + Math.random() * 15}s`,
+            '--delay': `${Math.random() * 10}s`,
+            '--duration': `${8 + Math.random() * 12}s`,
             '--x': `${Math.random() * 100}vw`,
-            '--size': `${0.8 + Math.random() * 0.5}em`
+            '--size': `${0.6 + Math.random() * 1.2}em`,
+            '--opacity': `${0.3 + Math.random() * 0.7}`
+          }}>❄</div>
+        ))}
+      </div>
+      
+      {/* Copos extra grandes de fondo */}
+      <div className="snowflakes-bg">
+        {[...Array(15)].map((_, i) => (
+          <div key={i} className="snowflake-big" style={{
+            '--delay': `${Math.random() * 15}s`,
+            '--duration': `${20 + Math.random() * 20}s`,
+            '--x': `${Math.random() * 100}vw`,
+            '--size': `${2 + Math.random() * 3}em`
           }}>❄</div>
         ))}
       </div>
