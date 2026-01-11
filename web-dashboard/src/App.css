@@ -24,6 +24,66 @@ body {
   justify-content: center;
   min-height: 100vh;
   gap: 1rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.loading-logo {
+  font-size: 5rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.loading-title {
+  font-size: 2.5rem;
+  color: #60a5fa;
+  margin: 0;
+  animation: slideUp 0.5s ease-out;
+}
+
+.loading-text {
+  color: #94a3b8;
+  font-size: 1rem;
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+.loading-brands {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem 2rem;
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 12px;
+  border: 1px solid #334155;
+  animation: fadeIn 1s ease-out 0.5s both;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-icon {
+  font-size: 1.5rem;
+}
+
+.brand-name {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.brand-separator {
+  color: #475569;
+  font-size: 1.25rem;
 }
 
 .spinner {
@@ -37,6 +97,26 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Header */
@@ -570,7 +650,57 @@ body {
 /* Footer */
 .footer {
   text-align: center;
-  padding: 1rem;
+  padding: 1.5rem 1rem;
   color: #64748b;
   font-size: 0.875rem;
+  margin-top: 1rem;
+  border-top: 1px solid #334155;
+}
+
+.footer-brands {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.footer-separator {
+  color: #475569;
+}
+
+/* Animaciones para elementos principales */
+.main-panel {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.temp-card {
+  animation: slideUp 0.4s ease-out;
+}
+
+.status-grid {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.status-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.reefer-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reefer-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.temp-value {
+  animation: pulse 3s ease-in-out infinite;
 }

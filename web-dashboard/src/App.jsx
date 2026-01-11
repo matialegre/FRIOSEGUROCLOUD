@@ -102,8 +102,23 @@ function App() {
   if (loading) {
     return (
       <div className="app loading">
-        <div className="spinner"></div>
-        <p>Conectando a Supabase...</p>
+        <div className="loading-content">
+          <div className="loading-logo">❄️</div>
+          <h1 className="loading-title">FrioSeguro</h1>
+          <div className="spinner"></div>
+          <p className="loading-text">Conectando a Supabase...</p>
+          <div className="loading-brands">
+            <div className="brand">
+              <span className="brand-icon">🏔️</span>
+              <span className="brand-name">Pan American Silver</span>
+            </div>
+            <div className="brand-separator">×</div>
+            <div className="brand">
+              <span className="brand-icon">⚡</span>
+              <span className="brand-name">Pandemonium Tech</span>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -182,7 +197,7 @@ function App() {
             <div className={`status-card ${reading?.defrostMode ? 'info' : 'ok'}`}>
               <span className="status-icon">🧊</span>
               <span className="status-label">DEFROST</span>
-              <span className="status-value">{reading?.defrostMode ? 'ACTIVO' : 'Normal'}</span>
+              <span className="status-value">{reading?.defrostMode ? 'ACTIVO' : 'Inactivo'}</span>
             </div>
           </div>
 
@@ -195,6 +210,10 @@ function App() {
             <div className="info-row">
               <span>🆔 ID:</span>
               <span>{selectedDevice.device_id}</span>
+            </div>
+            <div className="info-row">
+              <span>🌐 IP:</span>
+              <span>{selectedDevice.ip_address || 'Sin IP'}</span>
             </div>
             <div className="info-row">
               <span>⏱️ Uptime:</span>
@@ -346,6 +365,11 @@ function App() {
 
       {/* Footer */}
       <footer className="footer">
+        <div className="footer-brands">
+          <span>🏔️ Pan American Silver</span>
+          <span className="footer-separator">•</span>
+          <span>⚡ Pandemonium Tech</span>
+        </div>
         <p>FrioSeguro © 2026 - Sistema de Monitoreo de Reefers</p>
       </footer>
     </div>
