@@ -14,8 +14,8 @@ function App() {
   const [savingConfig, setSavingConfig] = useState(false)
   const [configCountdown, setConfigCountdown] = useState(0)
 
-  // Obtener dispositivo seleccionado de la lista
-  const selectedDevice = devices.find(d => d.device_id === selectedDeviceId) || devices[0] || null
+  // Obtener dispositivo seleccionado de la lista (sin fallback automático)
+  const selectedDevice = selectedDeviceId ? devices.find(d => d.device_id === selectedDeviceId) : null
 
   // Cargar datos
   const loadData = async () => {
@@ -23,9 +23,9 @@ function App() {
       const devicesData = await getDevicesWithReadings()
       setDevices(devicesData)
       
-      // Solo setear el ID si no hay ninguno seleccionado
-      if (!selectedDeviceId && devicesData.length > 0) {
-        setSelectedDeviceId(devicesData[0].device_id)
+      // Solo setear el ID inicial una vez
+      if (devicesData.length > 0) {
+        setSelectedDeviceId(prev => prev || devicesData[0].device_id)
       }
       
       const alertsData = await getActiveAlerts()
@@ -263,21 +263,45 @@ function App() {
             )}
           </div>
 
-          {/* Temperatura grande */}
+          {/* Temperatura grande O Estado de Descongelamiento */}
           <div className="temp-card">
-            <span className="temp-label">TEMPERATURA</span>
-            <span 
-              className="temp-value" 
-              style={{ color: getTempColor(reading?.tempAvg) }}
-            >
-              {reading?.tempAvg !== null && reading?.tempAvg !== undefined && reading?.tempAvg > -55 
-                ? `${reading.tempAvg.toFixed(1)}°C` 
-                : '--.-°C'}
-            </span>
-            <div className="temp-sensors">
-              <span>T1: {reading?.temp1?.toFixed(1) || '--'}°C</span>
-              <span>T2: {reading?.temp2?.toFixed(1) || '--'}°C</span>
-            </div>
+            {reading?.defrostMode ? (
+              <>
+                <span className="temp-label" style={{ color: '#2196F3' }}>🧊 MODO DESCONGELAMIENTO</span>
+                <span className="temp-value defrost-active" style={{ color: '#2196F3', fontSize: '2.5rem' }}>
+                  ACTIVO
+                </span>
+                <div className="defrost-info">
+                  <span style={{ color: '#90CAF9' }}>Alertas suspendidas hasta finalizar ciclo</span>
+                </div>
+              </>
+            ) : reading?.cooldownRemainingSec > 0 ? (
+              <>
+                <span className="temp-label" style={{ color: '#FF9800' }}>⏳ ESPERANDO POST-DESCONGELAMIENTO</span>
+                <span className="temp-value cooldown-timer" style={{ color: '#FF9800', fontSize: '3rem' }}>
+                  {formatCountdown(reading.cooldownRemainingSec)}
+                </span>
+                <div className="defrost-info">
+                  <span style={{ color: '#FFB74D' }}>Alertas suspendidas - Sistema estabilizándose</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="temp-label">TEMPERATURA</span>
+                <span 
+                  className="temp-value" 
+                  style={{ color: getTempColor(reading?.tempAvg) }}
+                >
+                  {reading?.tempAvg !== null && reading?.tempAvg !== undefined && reading?.tempAvg > -55 
+                    ? `${reading.tempAvg.toFixed(1)}°C` 
+                    : '--.-°C'}
+                </span>
+                <div className="temp-sensors">
+                  <span>T1: {reading?.temp1?.toFixed(1) || '--'}°C</span>
+                  <span>T2: {reading?.temp2?.toFixed(1) || '--'}°C</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Estado */}

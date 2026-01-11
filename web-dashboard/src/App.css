@@ -813,6 +813,45 @@ body {
 }
 
 /* ============================================
+   DEFROST MODE DISPLAY
+   ============================================ */
+.defrost-active {
+  animation: defrostPulse 2s ease-in-out infinite;
+}
+
+@keyframes defrostPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.02); }
+}
+
+.cooldown-timer {
+  animation: timerPulse 1s ease-in-out infinite;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+}
+
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.defrost-info {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.temp-card.defrost-mode {
+  background: linear-gradient(135deg, #1e3a5f, #0d47a1) !important;
+  border: 2px solid #2196F3 !important;
+}
+
+.temp-card.cooldown-mode {
+  background: linear-gradient(135deg, #3d2e00, #5d4e00) !important;
+  border: 2px solid #FF9800 !important;
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 @media (max-width: 768px) {
