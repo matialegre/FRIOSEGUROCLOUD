@@ -11,6 +11,8 @@ function App() {
   const [showConfig, setShowConfig] = useState(false)
   const [editConfig, setEditConfig] = useState({})
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [savingConfig, setSavingConfig] = useState(false)
+  const [configCountdown, setConfigCountdown] = useState(0)
 
   // Cargar datos
   const loadData = async () => {
@@ -61,9 +63,12 @@ function App() {
     if (selectedDevice) loadConfig()
   }, [selectedDevice?.device_id])
 
-  // Guardar configuración
+  // Guardar configuración con bloqueo de UI
   const saveConfig = async () => {
-    if (!selectedDevice) return
+    if (!selectedDevice || savingConfig) return
+    
+    setSavingConfig(true)
+    setConfigCountdown(10)
     
     const success = await updateDeviceConfig(selectedDevice.device_id, {
       temp_critical: parseFloat(editConfig.temp_critical),
@@ -73,10 +78,21 @@ function App() {
     })
     
     if (success) {
-      alert('✅ Configuración guardada')
-      setShowConfig(false)
-      loadConfig()
+      // Countdown de 10 segundos mientras se aplica la config
+      let countdown = 10
+      const timer = setInterval(() => {
+        countdown--
+        setConfigCountdown(countdown)
+        if (countdown <= 0) {
+          clearInterval(timer)
+          setSavingConfig(false)
+          setShowConfig(false)
+          loadConfig()
+        }
+      }, 1000)
     } else {
+      setSavingConfig(false)
+      setConfigCountdown(0)
       alert('❌ Error al guardar')
     }
   }
@@ -97,6 +113,72 @@ function App() {
     const m = Math.floor((seconds % 3600) / 60)
     const s = seconds % 60
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+
+  // Formatear tiempo restante (minutos:segundos)
+  const formatCountdown = (seconds) => {
+    if (!seconds || seconds <= 0) return '0:00'
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  // Obtener estado del sistema con información clara
+  const getSystemState = (reading) => {
+    if (!reading) return { state: 'OFFLINE', label: 'Sin datos', color: '#6b7280', icon: '📴' }
+    
+    const state = reading.systemState || 'NORMAL'
+    const cooldown = reading.cooldownRemainingSec || 0
+    const configLoad = reading.configLoadRemainingSec || 0
+    
+    // Prioridad: LOADING_CONFIG > DEFROST > COOLDOWN > ALERT > NORMAL
+    if (configLoad > 0 || state === 'LOADING_CONFIG') {
+      return { 
+        state: 'LOADING_CONFIG', 
+        label: `CARGANDO CONFIG (${formatCountdown(configLoad)})`, 
+        color: '#8b5cf6', 
+        icon: '⚙️',
+        blocked: true
+      }
+    }
+    
+    if (reading.defrostMode || state === 'DEFROST') {
+      return { 
+        state: 'DEFROST', 
+        label: 'EN DESCONGELAMIENTO', 
+        color: '#06b6d4', 
+        icon: '🧊',
+        blocked: false
+      }
+    }
+    
+    if (cooldown > 0 || state === 'COOLDOWN') {
+      return { 
+        state: 'COOLDOWN', 
+        label: `ESPERA POST-DEFROST (${formatCountdown(cooldown)})`, 
+        color: '#f59e0b', 
+        icon: '⏳',
+        blocked: false
+      }
+    }
+    
+    if (reading.alertActive || state === 'ALERT') {
+      return { 
+        state: 'ALERT', 
+        label: 'ALERTA ACTIVA', 
+        color: '#ef4444', 
+        icon: '🚨',
+        blocked: false
+      }
+    }
+    
+    return { 
+      state: 'NORMAL', 
+      label: 'OPERACIÓN NORMAL', 
+      color: '#22c55e', 
+      icon: '✅',
+      blocked: false
+    }
   }
 
   if (loading) {
@@ -124,6 +206,7 @@ function App() {
   }
 
   const reading = selectedDevice?.reading
+  const systemState = getSystemState(reading)
 
   return (
     <div className="app">
@@ -160,6 +243,25 @@ function App() {
       {/* Panel principal */}
       {selectedDevice && (
         <div className="main-panel">
+          {/* Banner de estado del sistema */}
+          <div 
+            className="system-state-banner"
+            style={{ 
+              background: `linear-gradient(135deg, ${systemState.color}22, ${systemState.color}44)`,
+              borderColor: systemState.color
+            }}
+          >
+            <span className="state-icon">{systemState.icon}</span>
+            <span className="state-label" style={{ color: systemState.color }}>
+              {systemState.label}
+            </span>
+            {systemState.state === 'COOLDOWN' && reading?.cooldownRemainingSec > 0 && (
+              <span className="state-timer">
+                Monitoreo reactivará en {formatCountdown(reading.cooldownRemainingSec)}
+              </span>
+            )}
+          </div>
+
           {/* Temperatura grande */}
           <div className="temp-card">
             <span className="temp-label">TEMPERATURA</span>
@@ -257,26 +359,47 @@ function App() {
 
       {/* Lista de todos los Reefers */}
       <div className="reefers-list">
-        <h3>📦 Todos los Reefers</h3>
+        <h3>📦 Todos los Reefers ({devices.length})</h3>
         <div className="reefers-grid">
-          {devices.map(device => (
-            <div 
-              key={device.device_id} 
-              className={`reefer-card ${device.is_online ? 'online' : 'offline'} ${selectedDevice?.device_id === device.device_id ? 'selected' : ''}`}
-              onClick={() => setSelectedDevice(device)}
-            >
-              <div className="reefer-header">
-                <span className={`reefer-status ${device.is_online ? 'online' : 'offline'}`}></span>
-                <span className="reefer-name">{device.name || device.device_id}</span>
+          {devices.map(device => {
+            const deviceState = getSystemState(device.reading)
+            return (
+              <div 
+                key={device.device_id} 
+                className={`reefer-card ${device.is_online ? 'online' : 'offline'} ${selectedDevice?.device_id === device.device_id ? 'selected' : ''}`}
+                onClick={() => setSelectedDevice(device)}
+              >
+                <div className="reefer-header">
+                  <span className={`reefer-status ${device.is_online ? 'online' : 'offline'}`}></span>
+                  <span className="reefer-name">{device.name || device.device_id}</span>
+                </div>
+                <div className="reefer-temp" style={{ color: getTempColor(device.reading?.tempAvg) }}>
+                  {device.reading?.tempAvg !== null && device.reading?.tempAvg !== undefined && device.reading?.tempAvg > -55
+                    ? `${device.reading.tempAvg.toFixed(1)}°C`
+                    : '--.-°C'}
+                </div>
+                <div 
+                  className="reefer-state"
+                  style={{ 
+                    color: deviceState.color,
+                    background: `${deviceState.color}22`
+                  }}
+                >
+                  {deviceState.icon} {deviceState.state === 'COOLDOWN' 
+                    ? `ESPERA ${formatCountdown(device.reading?.cooldownRemainingSec)}`
+                    : deviceState.state === 'DEFROST' 
+                      ? 'DESCONGELANDO'
+                      : deviceState.state === 'ALERT'
+                        ? 'ALERTA'
+                        : deviceState.state === 'NORMAL'
+                          ? 'OK'
+                          : deviceState.state
+                  }
+                </div>
+                <div className="reefer-location">{device.location || 'Sin ubicación'}</div>
               </div>
-              <div className="reefer-temp" style={{ color: getTempColor(device.reading?.tempAvg) }}>
-                {device.reading?.tempAvg !== null && device.reading?.tempAvg !== undefined && device.reading?.tempAvg > -55
-                  ? `${device.reading.tempAvg.toFixed(1)}°C`
-                  : '--.-°C'}
-              </div>
-              <div className="reefer-location">{device.location || 'Sin ubicación'}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -310,55 +433,73 @@ function App() {
 
       {/* Modal de configuración */}
       {showConfig && (
-        <div className="modal-overlay" onClick={() => setShowConfig(false)}>
+        <div className="modal-overlay" onClick={() => !savingConfig && setShowConfig(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>⚙️ Configuración - {selectedDevice?.name}</h2>
-            
-            <div className="form-group">
-              <label>🌡️ Temperatura Crítica (°C)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={editConfig.temp_critical}
-                onChange={e => setEditConfig({...editConfig, temp_critical: e.target.value})}
-              />
-              <small>Si la temperatura supera este valor, se activa la alarma</small>
-            </div>
+            {savingConfig ? (
+              <div className="config-loading">
+                <div className="config-loading-icon">⚙️</div>
+                <h2>CARGANDO CONFIGURACIÓN</h2>
+                <div className="config-countdown">{configCountdown}</div>
+                <p>Aplicando cambios al dispositivo...</p>
+                <div className="config-progress">
+                  <div 
+                    className="config-progress-bar" 
+                    style={{ width: `${(10 - configCountdown) * 10}%` }}
+                  ></div>
+                </div>
+                <small>No cierre esta ventana</small>
+              </div>
+            ) : (
+              <>
+                <h2>⚙️ Configuración - {selectedDevice?.name}</h2>
+                
+                <div className="form-group">
+                  <label>🌡️ Temperatura Crítica (°C)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editConfig.temp_critical}
+                    onChange={e => setEditConfig({...editConfig, temp_critical: e.target.value})}
+                  />
+                  <small>Si la temperatura supera este valor, se activa la alarma</small>
+                </div>
 
-            <div className="form-group">
-              <label>⏱️ Tiempo de espera (minutos)</label>
-              <input
-                type="number"
-                value={editConfig.alert_delay_sec}
-                onChange={e => setEditConfig({...editConfig, alert_delay_sec: e.target.value})}
-              />
-              <small>Minutos que debe mantenerse la temperatura alta antes de alertar</small>
-            </div>
+                <div className="form-group">
+                  <label>⏱️ Tiempo de espera (minutos)</label>
+                  <input
+                    type="number"
+                    value={editConfig.alert_delay_sec}
+                    onChange={e => setEditConfig({...editConfig, alert_delay_sec: e.target.value})}
+                  />
+                  <small>Minutos que debe mantenerse la temperatura alta antes de alertar</small>
+                </div>
 
-            <div className="form-group">
-              <label>🧊 Tiempo post-descongelación (minutos)</label>
-              <input
-                type="number"
-                value={editConfig.defrost_cooldown_sec}
-                onChange={e => setEditConfig({...editConfig, defrost_cooldown_sec: e.target.value})}
-              />
-              <small>Tiempo de espera después de descongelación</small>
-            </div>
+                <div className="form-group">
+                  <label>🧊 Tiempo post-descongelación (minutos)</label>
+                  <input
+                    type="number"
+                    value={editConfig.defrost_cooldown_sec}
+                    onChange={e => setEditConfig({...editConfig, defrost_cooldown_sec: e.target.value})}
+                  />
+                  <small>Tiempo de espera después de descongelación</small>
+                </div>
 
-            <div className="form-group">
-              <label>🚪 Tiempo máx. puerta abierta (segundos)</label>
-              <input
-                type="number"
-                value={editConfig.door_open_max_sec}
-                onChange={e => setEditConfig({...editConfig, door_open_max_sec: e.target.value})}
-              />
-              <small>Tiempo máximo que la puerta puede estar abierta</small>
-            </div>
+                <div className="form-group">
+                  <label>🚪 Tiempo máx. puerta abierta (segundos)</label>
+                  <input
+                    type="number"
+                    value={editConfig.door_open_max_sec}
+                    onChange={e => setEditConfig({...editConfig, door_open_max_sec: e.target.value})}
+                  />
+                  <small>Tiempo máximo que la puerta puede estar abierta</small>
+                </div>
 
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowConfig(false)}>Cancelar</button>
-              <button className="btn-save" onClick={saveConfig}>💾 Guardar</button>
-            </div>
+                <div className="modal-actions">
+                  <button className="btn-cancel" onClick={() => setShowConfig(false)}>Cancelar</button>
+                  <button className="btn-save" onClick={saveConfig}>💾 Guardar</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

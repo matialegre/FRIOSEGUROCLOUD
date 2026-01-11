@@ -704,3 +704,132 @@ body {
 .temp-value {
   animation: pulse 3s ease-in-out infinite;
 }
+
+/* ============================================
+   BANNER DE ESTADO DEL SISTEMA
+   ============================================ */
+.system-state-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid;
+  margin-bottom: 1rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.state-icon {
+  font-size: 2rem;
+}
+
+.state-label {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.state-timer {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  padding-left: 1rem;
+  border-left: 1px solid #475569;
+}
+
+/* ============================================
+   ESTADO EN CARDS DE REEFERS
+   ============================================ */
+.reefer-state {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* ============================================
+   MODAL DE CARGA DE CONFIGURACIÓN
+   ============================================ */
+.config-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  min-height: 300px;
+}
+
+.config-loading-icon {
+  font-size: 4rem;
+  animation: spin 2s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.config-loading h2 {
+  color: #8b5cf6;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.config-countdown {
+  font-size: 4rem;
+  font-weight: 700;
+  color: #8b5cf6;
+  margin: 1rem 0;
+  font-family: monospace;
+}
+
+.config-loading p {
+  color: #94a3b8;
+  margin-bottom: 1.5rem;
+}
+
+.config-loading small {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.config-progress {
+  width: 100%;
+  max-width: 300px;
+  height: 8px;
+  background: #334155;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.config-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  border-radius: 4px;
+  transition: width 1s linear;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .system-state-banner {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+  
+  .state-timer {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid #475569;
+    padding-top: 0.5rem;
+  }
+  
+  .state-label {
+    font-size: 1rem;
+  }
+}
