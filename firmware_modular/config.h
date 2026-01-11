@@ -27,8 +27,13 @@
 // ============================================
 // DEVICE ID - Identificador único de este Reefer
 // ============================================
-#define DEVICE_ID "REEFER-01"          // Cambiar para cada Reefer: REEFER-01, REEFER-02, etc.
-#define DEVICE_NAME "Reefer Principal" // Nombre descriptivo
+// FORMATO: REEFER_[NUM]_[UBICACION]
+// Producción Santa Cruz: REEFER_01_SCZ, REEFER_02_SCZ, ... REEFER_06_SCZ
+// Desarrollo Bahía Blanca: REEFER_DEV_BHI
+//
+// IMPORTANTE: Cambiar esto para cada dispositivo físico!
+#define DEVICE_ID "REEFER_DEV_BHI"     // <-- CAMBIAR PARA CADA REEFER
+#define DEVICE_NAME "Reefer Desarrollo" // Nombre descriptivo
 
 // ============================================
 // TELEGRAM (para alertas cuando hay internet)
@@ -113,10 +118,15 @@ const int TELEGRAM_CHAT_COUNT = 1;  // Cantidad de chat IDs activos
 #define DEFAULT_DEFROST_COOLDOWN_MIN 30  // Minutos de espera después de descongelar (30 min por defecto)
 
 // ============================================
-// UBICACIÓN DEL CAMPAMENTO
+// UBICACIÓN DEL DISPOSITIVO
 // ============================================
-#define LOCATION_NAME "Campamento Parametican Silver"
-#define LOCATION_DETAIL "Cerro Moro, Santa Cruz, Argentina"
+// Para Santa Cruz:
+// #define LOCATION_NAME "Campamento Parametican Silver"
+// #define LOCATION_DETAIL "Cerro Moro, Santa Cruz, Argentina"
+//
+// Para Bahía Blanca (desarrollo):
+#define LOCATION_NAME "Desarrollo FrioSeguro"
+#define LOCATION_DETAIL "Bahía Blanca, Buenos Aires, Argentina"
 #define LOCATION_LAT -48.130438
 #define LOCATION_LON -66.652895
 
