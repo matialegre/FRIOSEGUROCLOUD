@@ -4,7 +4,7 @@ import './App.css'
 
 function App() {
   const [devices, setDevices] = useState([])
-  const [selectedDevice, setSelectedDevice] = useState(null)
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null)
   const [config, setConfig] = useState(null)
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -14,17 +14,18 @@ function App() {
   const [savingConfig, setSavingConfig] = useState(false)
   const [configCountdown, setConfigCountdown] = useState(0)
 
+  // Obtener dispositivo seleccionado de la lista
+  const selectedDevice = devices.find(d => d.device_id === selectedDeviceId) || devices[0] || null
+
   // Cargar datos
   const loadData = async () => {
     try {
       const devicesData = await getDevicesWithReadings()
       setDevices(devicesData)
       
-      if (!selectedDevice && devicesData.length > 0) {
-        setSelectedDevice(devicesData[0])
-      } else if (selectedDevice) {
-        const updated = devicesData.find(d => d.device_id === selectedDevice.device_id)
-        if (updated) setSelectedDevice(updated)
+      // Solo setear el ID si no hay ninguno seleccionado
+      if (!selectedDeviceId && devicesData.length > 0) {
+        setSelectedDeviceId(devicesData[0].device_id)
       }
       
       const alertsData = await getActiveAlerts()
@@ -232,7 +233,7 @@ function App() {
           <button
             key={device.device_id}
             className={`device-btn ${selectedDevice?.device_id === device.device_id ? 'active' : ''} ${device.is_online ? 'online' : 'offline'}`}
-            onClick={() => setSelectedDevice(device)}
+            onClick={() => setSelectedDeviceId(device.device_id)}
           >
             <span className="status-dot"></span>
             {device.name || device.device_id}
@@ -367,7 +368,7 @@ function App() {
               <div 
                 key={device.device_id} 
                 className={`reefer-card ${device.is_online ? 'online' : 'offline'} ${selectedDevice?.device_id === device.device_id ? 'selected' : ''}`}
-                onClick={() => setSelectedDevice(device)}
+                onClick={() => setSelectedDeviceId(device.device_id)}
               >
                 <div className="reefer-header">
                   <span className={`reefer-status ${device.is_online ? 'online' : 'offline'}`}></span>
