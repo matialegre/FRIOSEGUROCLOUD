@@ -127,12 +127,12 @@ export default function Login({ onLogin }) {
 
       {/* Decoración de copos de nieve - MUCHOS MÁS */}
       <div className="snowflakes">
-        {[...Array(35)].map((_, i) => (
+        {[...Array(60)].map((_, i) => (
           <div key={i} className="snowflake" style={{
-            '--delay': `${Math.random() * 10}s`,
-            '--duration': `${8 + Math.random() * 12}s`,
+            '--delay': `${Math.random() * 12}s`,
+            '--duration': `${6 + Math.random() * 10}s`,
             '--x': `${Math.random() * 100}vw`,
-            '--size': `${0.6 + Math.random() * 1.2}em`,
+            '--size': `${0.5 + Math.random() * 1.5}em`,
             '--opacity': `${0.3 + Math.random() * 0.7}`
           }}>❄</div>
         ))}
@@ -140,12 +140,12 @@ export default function Login({ onLogin }) {
       
       {/* Copos extra grandes de fondo */}
       <div className="snowflakes-bg">
-        {[...Array(15)].map((_, i) => (
+        {[...Array(25)].map((_, i) => (
           <div key={i} className="snowflake-big" style={{
-            '--delay': `${Math.random() * 15}s`,
-            '--duration': `${20 + Math.random() * 20}s`,
+            '--delay': `${Math.random() * 20}s`,
+            '--duration': `${15 + Math.random() * 25}s`,
             '--x': `${Math.random() * 100}vw`,
-            '--size': `${2 + Math.random() * 3}em`
+            '--size': `${1.5 + Math.random() * 4}em`
           }}>❄</div>
         ))}
       </div>
