@@ -67,6 +67,8 @@ void handleApiStatus() {
   sys["sensor2_enabled"] = config.sensor2Enabled;
   sys["defrost_mode"] = state.defrostMode;
   sys["defrost_minutes"] = state.defrostMode ? (millis() - state.defrostStartTime) / 60000 : 0;
+  sys["cooldown_mode"] = state.cooldownMode;
+  sys["cooldown_remaining_sec"] = state.cooldownRemainingSec;
   sys["supabase_enabled"] = config.supabaseEnabled;
   
   JsonObject device = doc.createNestedObject("device");
