@@ -1,8 +1,27 @@
 import { useState, useEffect } from 'react'
 import { getDevicesWithReadings, getDeviceConfig, updateDeviceConfig, getActiveAlerts, acknowledgeAlert, resolveAlert } from './supabaseClient'
+import Login from './Login'
 import './App.css'
 
 function App() {
+  // Estado de autenticación
+  const [user, setUser] = useState(() => localStorage.getItem('frioseguro_user'))
+
+  // Logout
+  const handleLogout = () => {
+    localStorage.removeItem('frioseguro_user')
+    setUser(null)
+  }
+
+  // Si no hay usuario, mostrar login
+  if (!user) {
+    return <Login onLogin={setUser} />
+  }
+
+  return <Dashboard user={user} onLogout={handleLogout} />
+}
+
+function Dashboard({ user, onLogout }) {
   const [devices, setDevices] = useState([])
   const [selectedDeviceId, setSelectedDeviceId] = useState(null)
   const [config, setConfig] = useState(null)
@@ -224,6 +243,12 @@ function App() {
           <span className="update-time">
             {lastUpdate ? `Actualizado: ${lastUpdate.toLocaleTimeString()}` : ''}
           </span>
+          <div className="user-info">
+            <span className="user-name">👤 {user}</span>
+            <button className="logout-btn" onClick={onLogout}>
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
