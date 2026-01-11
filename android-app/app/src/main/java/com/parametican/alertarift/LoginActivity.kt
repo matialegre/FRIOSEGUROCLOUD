@@ -6,19 +6,24 @@ import android.view.animation.AnimationUtils
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import kotlin.concurrent.thread
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 
 class LoginActivity : AppCompatActivity() {
     
     companion object {
-        const val MODE_LOCAL = "local"
-        const val MODE_INTERNET = "internet"
-        const val SUPABASE_URL = "https://xhdeacnwdzvkivfjzard.supabase.co"
-        const val SUPABASE_KEY = "sb_publishable_JhTUv1X2LHMBVILUaysJ3g_Ho11zu-Q"
+        // UDP Discovery - debe coincidir con el ESP32
+        const val UDP_DISCOVERY_PORT = 5555
+        const val UDP_DISCOVERY_MAGIC = "REEFER_DISCOVER"
+        const val UDP_DISCOVERY_RESPONSE = "REEFER_HERE"
     }
     
-    private var selectedMode = MODE_LOCAL
+    private var isSearching = AtomicBoolean(false)
+    private var foundDevice = AtomicBoolean(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,108 +42,181 @@ class LoginActivity : AppCompatActivity() {
         val btnAutoConnect = findViewById<Button>(R.id.btnAutoConnect)
         val cardLogin = findViewById<LinearLayout>(R.id.cardLogin)
         val tvStatus = findViewById<TextView>(R.id.tvConnectionStatus)
-        
-        // Botones de modo
-        val btnModeLocal = findViewById<Button>(R.id.btnModeLocal)
-        val btnModeInternet = findViewById<Button>(R.id.btnModeInternet)
-        val layoutLocalConfig = findViewById<LinearLayout>(R.id.layoutLocalConfig)
 
         // Animación de entrada
         val slideUp = AnimationUtils.loadAnimation(this, android.R.anim.slide_in_left)
         slideUp.duration = 500
         cardLogin.startAnimation(slideUp)
 
-        // Siempre mostrar rift.local por defecto
-        etServerIp.setText("rift.local")
-        
-        // Selector de modo
-        btnModeLocal?.setOnClickListener {
-            selectedMode = MODE_LOCAL
-            btnModeLocal.alpha = 1f
-            btnModeInternet?.alpha = 0.5f
-            layoutLocalConfig?.visibility = android.view.View.VISIBLE
-            tvStatus.text = "📡 Modo LOCAL - Conectar al RIFT en tu red WiFi"
-        }
-        
-        btnModeInternet?.setOnClickListener {
-            selectedMode = MODE_INTERNET
-            btnModeLocal?.alpha = 0.5f
-            btnModeInternet.alpha = 1f
-            layoutLocalConfig?.visibility = android.view.View.GONE
-            tvStatus.text = "🌐 Modo INTERNET - Conectar via Supabase"
-        }
+        // Mostrar reefer.local por defecto
+        etServerIp.setText("reefer.local")
 
-        // Auto-conectar con rift.local
+        // Auto-conectar: mDNS + UDP Discovery
         btnAutoConnect.setOnClickListener {
-            if (selectedMode == MODE_INTERNET) {
-                tvStatus.text = "🌐 Conectando a la nube..."
-                testInternetConnection(tvStatus)
-            } else {
-                tvStatus.text = "🔍 Buscando Reefer en la red..."
-                tryAutoConnect(etServerIp, tvStatus)
+            if (isSearching.get()) {
+                Toast.makeText(this, "Ya hay una búsqueda en progreso...", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+            tvStatus.text = "🔍 Buscando Reefer en la red..."
+            searchForDevice(etServerIp, tvStatus)
         }
 
         btnConnect.setOnClickListener {
-            if (selectedMode == MODE_INTERNET) {
-                tvStatus.text = "🌐 Conectando a la nube..."
-                testInternetConnection(tvStatus)
-            } else {
-                val ip = etServerIp.text.toString().trim()
-                if (ip.isEmpty()) {
-                    Toast.makeText(this, "Ingresa la IP del servidor", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                tvStatus.text = "🔄 Conectando..."
-                testConnection(ip, tvStatus)
+            val ip = etServerIp.text.toString().trim()
+            if (ip.isEmpty()) {
+                Toast.makeText(this, "Ingresa la IP del servidor", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+
+            tvStatus.text = "🔄 Conectando..."
+            testConnection(ip, tvStatus)
         }
         
-        tvStatus.text = "Selecciona el modo de conexión"
+        tvStatus.text = "Presiona el botón verde para buscar tu Reefer"
     }
     
-    private fun tryAutoConnect(etServerIp: EditText, tvStatus: TextView) {
-        val addresses = listOf(
-            "reefer.local",
-            "192.168.0.11:3000",
-            "192.168.1.100",
-            "192.168.0.100",
-            "192.168.4.1"
-        )
+    /**
+     * Busca el dispositivo ESP32 en la red:
+     * 1. Primero intenta mDNS (reefer.local)
+     * 2. Si falla, usa UDP Broadcast Discovery (funciona en cualquier red)
+     */
+    private fun searchForDevice(etServerIp: EditText, tvStatus: TextView) {
+        isSearching.set(true)
+        foundDevice.set(false)
         
         thread {
-            for (addr in addresses) {
-                try {
-                    val url = URL("http://$addr/api/status")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.connectTimeout = 2000
-                    conn.readTimeout = 2000
-                    val code = conn.responseCode
-                    conn.disconnect()
-                    
-                    if (code == 200) {
-                        runOnUiThread {
-                            etServerIp.setText(addr)
-                            tvStatus.text = "✅ RIFT encontrado en $addr"
-                            
-                            getSharedPreferences("parametican", MODE_PRIVATE).edit()
-                                .putString("server_ip", addr)
-                                .putString("connection_mode", MODE_LOCAL)
-                                .putBoolean("logged_in", true)
-                                .apply()
-                            
-                            etServerIp.postDelayed({ goToMain() }, 1000)
-                        }
-                        return@thread
-                    }
-                } catch (e: Exception) {
-                    // Continuar
+            // Paso 1: Intentar mDNS primero (es lo más rápido si funciona)
+            runOnUiThread { tvStatus.text = "🔍 Intentando mDNS (reefer.local)..." }
+            
+            if (tryConnect("reefer.local")) {
+                onDeviceFound("reefer.local", etServerIp, tvStatus)
+                return@thread
+            }
+            
+            // Paso 2: UDP Broadcast Discovery
+            // Envía un broadcast a toda la red, el ESP32 responde con su IP
+            runOnUiThread { tvStatus.text = "🔍 Enviando broadcast UDP..." }
+            
+            val discoveredIp = udpDiscovery()
+            if (discoveredIp != null) {
+                // Verificar que responde HTTP
+                runOnUiThread { tvStatus.text = "🔍 Verificando $discoveredIp..." }
+                if (tryConnect(discoveredIp)) {
+                    onDeviceFound(discoveredIp, etServerIp, tvStatus)
+                    return@thread
                 }
             }
             
+            // No encontrado
+            isSearching.set(false)
             runOnUiThread {
-                tvStatus.text = "❌ No se encontró RIFT. Ingresa la IP manualmente."
+                tvStatus.text = "❌ No se encontró Reefer.\n\nOpciones:\n• Verifica que el ESP32 esté encendido\n• Asegurate de estar en la misma red WiFi\n• Ingresa la IP manualmente"
             }
+        }
+    }
+    
+    /**
+     * UDP Broadcast Discovery
+     * Envía un mensaje broadcast y espera respuesta del ESP32
+     * Funciona en cualquier red, sin importar el rango de IPs
+     */
+    private fun udpDiscovery(): String? {
+        var socket: DatagramSocket? = null
+        try {
+            socket = DatagramSocket()
+            socket.broadcast = true
+            socket.soTimeout = 5000  // 5 segundos de timeout
+            
+            // Enviar broadcast
+            val message = UDP_DISCOVERY_MAGIC.toByteArray()
+            val broadcastAddress = InetAddress.getByName("255.255.255.255")
+            val sendPacket = DatagramPacket(message, message.size, broadcastAddress, UDP_DISCOVERY_PORT)
+            
+            // Enviar 3 veces para mayor confiabilidad
+            repeat(3) {
+                socket.send(sendPacket)
+                Thread.sleep(100)
+            }
+            
+            // Esperar respuesta
+            val buffer = ByteArray(256)
+            val receivePacket = DatagramPacket(buffer, buffer.size)
+            
+            // Intentar recibir varias veces
+            repeat(3) {
+                try {
+                    socket.receive(receivePacket)
+                    val response = String(receivePacket.data, 0, receivePacket.length)
+                    
+                    // Formato esperado: "REEFER_HERE|192.168.1.100|REEFER-01|Reefer Principal"
+                    if (response.startsWith(UDP_DISCOVERY_RESPONSE)) {
+                        val parts = response.split("|")
+                        if (parts.size >= 2) {
+                            val ip = parts[1]
+                            android.util.Log.d("LoginActivity", "UDP Discovery: encontrado en $ip")
+                            return ip
+                        }
+                    }
+                } catch (e: java.net.SocketTimeoutException) {
+                    // Timeout, intentar de nuevo
+                }
+            }
+            
+            return null
+        } catch (e: Exception) {
+            android.util.Log.e("LoginActivity", "UDP Discovery error: ${e.message}")
+            return null
+        } finally {
+            socket?.close()
+        }
+    }
+    
+    /**
+     * Intenta conectar a una IP y verificar si es el ESP32
+     */
+    private fun tryConnect(address: String): Boolean {
+        return try {
+            val url = URL("http://$address/api/status")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.requestMethod = "GET"
+            val code = conn.responseCode
+            
+            // Verificar que sea realmente nuestro dispositivo
+            if (code == 200) {
+                val response = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+                // Verificar que tenga el formato esperado
+                response.contains("sensor") && response.contains("system")
+            } else {
+                conn.disconnect()
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * Llamado cuando se encuentra el dispositivo
+     */
+    private fun onDeviceFound(address: String, etServerIp: EditText, tvStatus: TextView) {
+        if (foundDevice.getAndSet(true)) return  // Evitar duplicados
+        isSearching.set(false)
+        
+        runOnUiThread {
+            etServerIp.setText(address)
+            tvStatus.text = "✅ Reefer encontrado en $address"
+            
+            // Guardar y conectar
+            getSharedPreferences("parametican", MODE_PRIVATE).edit()
+                .putString("server_ip", address)
+                .putBoolean("logged_in", true)
+                .apply()
+            
+            // Esperar 1 segundo y conectar
+            etServerIp.postDelayed({ goToMain() }, 1000)
         }
     }
     
@@ -148,6 +226,7 @@ class LoginActivity : AppCompatActivity() {
                 val url = URL("http://$ip/api/status")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.connectTimeout = 5000
+                conn.readTimeout = 5000
                 val code = conn.responseCode
                 conn.disconnect()
                 
@@ -156,7 +235,6 @@ class LoginActivity : AppCompatActivity() {
                         tvStatus.text = "✅ Conectado"
                         getSharedPreferences("parametican", MODE_PRIVATE).edit()
                             .putString("server_ip", ip)
-                            .putString("connection_mode", MODE_LOCAL)
                             .putBoolean("logged_in", true)
                             .apply()
                         goToMain()
@@ -166,39 +244,6 @@ class LoginActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread { tvStatus.text = "❌ Error: ${e.message}" }
-            }
-        }
-    }
-    
-    private fun testInternetConnection(tvStatus: TextView) {
-        thread {
-            try {
-                val url = URL("$SUPABASE_URL/rest/v1/devices?limit=1")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 10000
-                conn.setRequestProperty("apikey", SUPABASE_KEY)
-                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_KEY")
-                val code = conn.responseCode
-                conn.disconnect()
-                
-                if (code == 200) {
-                    runOnUiThread {
-                        tvStatus.text = "✅ Conectado a la nube"
-                        getSharedPreferences("parametican", MODE_PRIVATE).edit()
-                            .putString("supabase_url", SUPABASE_URL)
-                            .putString("supabase_key", SUPABASE_KEY)
-                            .putString("connection_mode", MODE_INTERNET)
-                            .putBoolean("logged_in", true)
-                            .apply()
-                        
-                        Toast.makeText(this, "🌐 Modo INTERNET activado", Toast.LENGTH_SHORT).show()
-                        goToMain()
-                    }
-                } else {
-                    runOnUiThread { tvStatus.text = "❌ Error de conexión: $code" }
-                }
-            } catch (e: Exception) {
-                runOnUiThread { tvStatus.text = "❌ Sin internet: ${e.message}" }
             }
         }
     }

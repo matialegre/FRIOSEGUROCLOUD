@@ -32,6 +32,8 @@ object SupabaseClient {
         val acPower: Boolean,
         val alertActive: Boolean,
         val defrostMode: Boolean,
+        val cooldownMode: Boolean,
+        val cooldownRemainingSec: Int,
         val relayOn: Boolean,
         val uptimeSec: Long?,
         val simulationMode: Boolean
@@ -98,6 +100,8 @@ object SupabaseClient {
                     acPower = reading?.optBoolean("ac_power", true) ?: true,
                     alertActive = reading?.optBoolean("alert_active", false) ?: false,
                     defrostMode = reading?.optBoolean("defrost_mode", false) ?: false,
+                    cooldownMode = reading?.optBoolean("cooldown_mode", false) ?: false,
+                    cooldownRemainingSec = reading?.optInt("cooldown_remaining_sec", 0) ?: 0,
                     relayOn = reading?.optBoolean("relay_on", false) ?: false,
                     uptimeSec = reading?.optLong("uptime_sec", 0),
                     simulationMode = reading?.optBoolean("simulation_mode", false) ?: false
@@ -140,6 +144,8 @@ object SupabaseClient {
                 acPower = reading?.optBoolean("ac_power", true) ?: true,
                 alertActive = reading?.optBoolean("alert_active", false) ?: false,
                 defrostMode = reading?.optBoolean("defrost_mode", false) ?: false,
+                cooldownMode = reading?.optBoolean("cooldown_mode", false) ?: false,
+                cooldownRemainingSec = reading?.optInt("cooldown_remaining_sec", 0) ?: 0,
                 relayOn = reading?.optBoolean("relay_on", false) ?: false,
                 uptimeSec = reading?.optLong("uptime_sec", 0),
                 simulationMode = reading?.optBoolean("simulation_mode", false) ?: false

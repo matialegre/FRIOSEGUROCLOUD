@@ -181,11 +181,18 @@ void checkDefrostSignal() {
         supabaseSendDefrostStart(sensorData.tempAvg, "relay_signal");
         
       } else if (!defrostDetected && state.defrostMode) {
-        // Salió del descongelamiento
+        // Salió del descongelamiento - INICIAR COOLDOWN
         unsigned long defrostMin = (millis() - state.defrostStartTime) / 60000;
         state.defrostMode = false;
         state.defrostStartTime = 0;
+        
+        // Iniciar período de cooldown (espera post-descongelamiento)
+        state.cooldownMode = true;
+        state.cooldownStartTime = millis();
+        state.cooldownRemainingSec = config.defrostCooldownSec;
+        
         Serial.printf("[DEFROST] ✓ FINALIZADO - Duró %lu minutos\n", defrostMin);
+        Serial.printf("[COOLDOWN] ⏳ Iniciando espera de %d minutos\n", config.defrostCooldownSec / 60);
       }
     }
   } else {

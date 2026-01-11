@@ -14,7 +14,7 @@
 // WIFIMANAGER - Configuración del Access Point
 // ============================================
 #define AP_NAME "Reefer-Setup"         // Nombre del AP cuando no hay WiFi
-#define AP_PASSWORD "reefer1234"         // Password del AP (mínimo 8 caracteres)
+#define AP_PASSWORD "reefer1234"       // Password del AP (mínimo 8 caracteres)
 #define AP_TIMEOUT 180                 // Segundos antes de reiniciar si no se configura
 
 // ============================================
@@ -28,7 +28,7 @@
 // DEVICE ID - Identificador único de este Reefer
 // ============================================
 #define DEVICE_ID "REEFER-01"          // Cambiar para cada Reefer: REEFER-01, REEFER-02, etc.
-#define DEVICE_NAME "Reefer Principal"   // Nombre descriptivo
+#define DEVICE_NAME "Reefer Principal" // Nombre descriptivo
 
 // ============================================
 // TELEGRAM (para alertas cuando hay internet)
@@ -36,8 +36,10 @@
 // Bot: @FrioSeguro_bot
 #define TELEGRAM_BOT_TOKEN "8175168657:AAE5HJBnp4Hx6LOECBh7Ps3utw35WMRdGnI"
 
-// Chat IDs de los usuarios que recibirán alertas
-// Para obtener tu chat ID: habla con @userinfobot en Telegram
+// Chat ID principal para alertas
+#define TELEGRAM_CHAT_ID "7713503644"
+
+// Chat IDs de los usuarios que recibirán alertas (para múltiples usuarios)
 const char* TELEGRAM_CHAT_IDS[] = {
     "7713503644",  // Usuario 1
     // "7713503645",  // Usuario 2
@@ -50,8 +52,7 @@ const int TELEGRAM_CHAT_COUNT = 1;  // Cantidad de chat IDs activos
 // ============================================
 #define SUPABASE_URL "https://xhdeacnwdzvkivfjzard.supabase.co"
 #define SUPABASE_ANON_KEY "sb_publishable_JhTUv1X2LHMBVILUaysJ3g_Ho11zu-Q"
-#define SUPABASE_SECRET_KEY "sb_secret_sEzxiZ5KZ008fB4XBXYQpg_FxARjoIf"
-#define SUPABASE_SYNC_INTERVAL_MS 5000  // Enviar datos cada 5 segundos
+#define SUPABASE_SYNC_INTERVAL 5000  // Enviar cada 5 segundos
 
 // ============================================
 // PINES ESP32
@@ -64,9 +65,10 @@ const int TELEGRAM_CHAT_COUNT = 1;  // Cantidad de chat IDs activos
 
 // Sensor de puerta (Reed Switch)
 #define PIN_DOOR_SENSOR 5      // GPIO5 - Reed switch (magnético)
+#define PIN_DOOR PIN_DOOR_SENSOR  // Alias para compatibilidad
 
 // Relay para sirena/luz de alerta
-#define PIN_RELAY 16           // GPIO16 - Relay (0=ON, 1=OFF)
+#define PIN_RELAY 26           // GPIO26 - Relay (0=ON, 1=OFF)
 
 // LEDs de estado
 #define PIN_LED_OK 2           // GPIO2 - LED verde (built-in en muchos ESP32)
@@ -77,6 +79,15 @@ const int TELEGRAM_CHAT_COUNT = 1;  // Cantidad de chat IDs activos
 
 // Botón de reset WiFi (mantener 5 segundos para borrar WiFi)
 #define PIN_WIFI_RESET 0       // GPIO0 - Botón BOOT del ESP32
+
+// Pin de entrada para modo descongelación (relé del sistema de frío)
+// Configurable como NO (Normalmente Abierto) o NC (Normalmente Cerrado)
+#define PIN_DEFROST_INPUT 33   // GPIO33 - Entrada para relé de descongelación (usar pull-up interno)
+
+// Modo del contacto del relé de descongelación (configurable desde la web)
+// false = NO (Normalmente Abierto): pin HIGH = normal, pin LOW = descongelación
+// true = NC (Normalmente Cerrado): pin LOW = normal, pin HIGH = descongelación
+#define DEFAULT_DEFROST_PIN_NC false  // Por defecto asumimos NO (Normalmente Abierto)
 
 // ============================================
 // SENSORES HABILITADOS
@@ -98,6 +109,9 @@ const int TELEGRAM_CHAT_COUNT = 1;  // Cantidad de chat IDs activos
 #define DEFAULT_ALERT_DELAY_SEC 300      // Segundos antes de alertar (5 min)
 #define DEFAULT_DOOR_OPEN_MAX_SEC 180    // Máximo tiempo puerta abierta (3 min)
 
+// Tiempo de espera después de descongelación (el sistema se enfría antes de reactivar monitoreo)
+#define DEFAULT_DEFROST_COOLDOWN_MIN 30  // Minutos de espera después de descongelar (30 min por defecto)
+
 // ============================================
 // UBICACIÓN DEL CAMPAMENTO
 // ============================================
@@ -118,6 +132,13 @@ const int TELEGRAM_CHAT_COUNT = 1;  // Cantidad de chat IDs activos
 // ============================================
 #define RELAY_ON LOW    // 0 = Encendido
 #define RELAY_OFF HIGH  // 1 = Apagado
+
+// ============================================
+// PULSO DE RELÉ AL CONECTAR WIFI
+// ============================================
+// Descomentar la siguiente línea para activar pulso de relé al conectar
+#define RELAY_PULSE_ON_CONNECT
+#define RELAY_PULSE_DURATION_MS 1000  // Duración del pulso en milisegundos
 
 // ============================================
 // MODO SIMULACIÓN (para testing sin sensores)

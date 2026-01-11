@@ -63,6 +63,9 @@ struct SystemState {
   String localIP;
   bool defrostMode;
   unsigned long defrostStartTime;
+  bool cooldownMode;              // En período de espera post-descongelamiento
+  unsigned long cooldownStartTime; // Cuándo empezó el cooldown
+  int cooldownRemainingSec;        // Segundos restantes de cooldown
 };
 
 struct HistoryPoint {

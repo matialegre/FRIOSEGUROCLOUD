@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_card"
+    android:padding="12dp"
+    android:layout_marginBottom="8dp"
+    android:gravity="center_vertical">
+
+    <!-- Status indicator -->
+    <View
+        android:id="@+id/statusIndicator"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:background="@drawable/bg_status_online" />
+
+    <!-- Reefer info -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="12dp">
+
+        <TextView
+            android:id="@+id/tvReeferName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Reefer Principal"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvReeferId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="REEFER-01"
+            android:textColor="#64748b"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Temperature -->
+    <TextView
+        android:id="@+id/tvReeferTemp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="-22.5°C"
+        android:textColor="#22d3ee"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- Status text -->
+    <TextView
+        android:id="@+id/tvReeferStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Online"
+        android:textColor="#22c55e"
+        android:textSize="12sp"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/bg_status_badge"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp" />
+
+</LinearLayout>

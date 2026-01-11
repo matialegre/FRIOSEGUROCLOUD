@@ -1,10 +1,10 @@
 /*
- * SISTEMA MONITOREO RIFT v2.0 - Campamento Parametican Silver
+ * SISTEMA MONITOREO REEFER v2.0 - Campamento Parametican Silver
  * ESP32 con WiFiManager, mDNS, múltiples sensores
  * 
  * CARACTERÍSTICAS:
  * - WiFiManager: Configura WiFi via portal web (192.168.4.1)
- * - mDNS: Acceso via http://rift.local
+ * - mDNS: Acceso via http://reefer.local
  * - Soporte para 1-3 sensores DS18B20 + DHT22 opcional
  * - Modo simulación para testing
  * - Telegram + Supabase
@@ -12,6 +12,7 @@
 
 #include <WiFi.h>
 #include <WiFiManager.h>
+#include <WiFiUdp.h>
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <SPIFFS.h>
@@ -30,7 +31,13 @@
 // ============================================
 WebServer server(80);
 WiFiManager wifiManager;
+WiFiUDP udpDiscovery;
 Preferences prefs;
+
+// UDP Discovery - Puerto donde escucha el ESP32
+#define UDP_DISCOVERY_PORT 5555
+#define UDP_DISCOVERY_MAGIC "REEFER_DISCOVER"
+#define UDP_DISCOVERY_RESPONSE "REEFER_HERE"
 OneWire oneWire(PIN_ONEWIRE);
 DallasTemperature ds18b20(&oneWire);
 DHT dht(PIN_DHT22, DHT22);
@@ -43,9 +50,12 @@ struct Config {
   float tempCritical;
   int alertDelaySec;
   int doorOpenMaxSec;
+  int defrostCooldownSec;  // Tiempo de espera post-descongelación
+  bool defrostRelayNC;     // true = Normal Cerrado, false = Normal Abierto
   bool relayEnabled;
   bool buzzerEnabled;
   bool telegramEnabled;
+  bool supabaseEnabled;    // Habilitar envío a Supabase
   bool sensor1Enabled;
   bool sensor2Enabled;
   bool dht22Enabled;
@@ -71,6 +81,7 @@ struct SensorData {
 struct SystemState {
   bool alertActive;
   bool criticalAlert;
+  bool alertAcknowledged;        // Usuario presionó DETENER - no volver a sonar hasta que vuelva a normal
   String alertMessage;
   unsigned long alertStartTime;
   unsigned long highTempStartTime;
@@ -81,9 +92,12 @@ struct SystemState {
   unsigned long lastInternetCheck;
   unsigned long lastSensorRead;
   unsigned long lastTelegramAlert;
+  unsigned long lastSupabaseSync;   // Último envío a Supabase
   unsigned long uptime;
   int totalAlerts;
   String localIP;
+  bool defrostMode;              // Modo descongelamiento - deshabilita TODAS las alertas
+  unsigned long defrostStartTime; // Cuando se activó el modo descongelamiento
 };
 
 struct HistoryPoint {
@@ -118,28 +132,44 @@ int offlineQueueIndex = 0;
 // Contador de conexiones de apps (para LED azul)
 unsigned long lastAppConnection = 0;
 bool appConnected = false;
-int androidConnections = 0;  // Contador de conexiones Android activas
-unsigned long lastAndroidPing = 0;
-
-// Variables para alertas
-bool telegramAlertSent = false;
-bool manualAlert = false;  // Alertas manuales no se auto-desactivan
 
 // ============================================
 // SETUP
 // ============================================
 void setup() {
   Serial.begin(115200);
+  delay(100);  // Esperar que Serial esté listo
+  Serial.flush();
+  
   Serial.println("\n\n========================================");
-  Serial.println("  RIFT Monitor v2.0 - Parametican Silver");
+  Serial.println("  Reefer Monitor v2.0 - Parametican Silver");
   Serial.println("========================================\n");
 
   initPins();
   initSPIFFS();
-  loadConfig();
-  initSensors();
+  loadConfig();      // Cargar config PRIMERO
+  
+  // WiFi PRIMERO (WiFiManager puede bloquear Serial)
   connectWiFi();
+  
+  // Pulso de relé al conectar WiFi (si está habilitado)
+  #ifdef RELAY_PULSE_ON_CONNECT
+  if (state.wifiConnected) {
+    Serial.println("[RELAY] Pulso de conexión...");
+    digitalWrite(PIN_RELAY, RELAY_ON);
+    delay(RELAY_PULSE_DURATION_MS);
+    digitalWrite(PIN_RELAY, RELAY_OFF);
+    Serial.println("[RELAY] Pulso completado");
+  }
+  #endif
+  
+  // Sensores DESPUÉS de WiFi para que Serial funcione bien
+  Serial.flush();
+  Serial.println("\n[SENSORES] Inicializando...");
+  initSensors();
+  
   setupMDNS();
+  initUdpDiscovery();
   setupWebServer();
   server.begin();
   
@@ -174,6 +204,7 @@ unsigned long wifiResetButtonPressed = 0;
 
 void loop() {
   server.handleClient();
+  handleUdpDiscovery();  // Escuchar requests de discovery de la app
   
   // Verificar botón de reset WiFi (mantener 5 segundos)
   checkWiFiResetButton();
@@ -194,8 +225,7 @@ void loop() {
     state.lastInternetCheck = millis();
   }
   
-  syncToSupabase();
-  checkCloudCommands();  // Verificar comandos desde la nube
+  supabaseSync();
   updateOutputs();
   
   delay(10);
@@ -275,28 +305,83 @@ void initSPIFFS() {
 }
 
 void initSensors() {
+  Serial.println("[SENSOR] Iniciando DS18B20...");
+  Serial.flush();
+  
+  // Inicializar DS18B20
   ds18b20.begin();
+  delay(500);  // Dar tiempo al sensor
+  
   int count = ds18b20.getDeviceCount();
-  Serial.printf("[OK] DS18B20: %d sensor(es) encontrado(s)\n", count);
+  Serial.printf("[SENSOR] Sensores detectados: %d\n", count);
+  Serial.flush();
+  
+  // Si no detectó sensores, intentar de nuevo
+  if (count == 0) {
+    Serial.println("[SENSOR] Reintentando...");
+    delay(1000);
+    ds18b20.begin();
+    delay(500);
+    count = ds18b20.getDeviceCount();
+    Serial.printf("[SENSOR] Reintento - detectados: %d\n", count);
+  }
+  
+  sensorData.sensorCount = count;
+  
+  // Configurar resolución
+  if (count > 0) {
+    ds18b20.setResolution(12);
+    ds18b20.setWaitForConversion(true);  // BLOQUEAR para lectura inicial
+    
+    // Hacer lectura inicial
+    Serial.println("[SENSOR] Leyendo temperatura inicial...");
+    Serial.flush();
+    ds18b20.requestTemperatures();
+    
+    float t = ds18b20.getTempCByIndex(0);
+    Serial.printf("[SENSOR] >>> TEMPERATURA: %.2f C <<<\n", t);
+    Serial.flush();
+    
+    // Guardar lectura inicial
+    if (t > -55.0 && t < 125.0 && t != -127.0 && t != 85.0) {
+      sensorData.temp1 = t;
+      sensorData.tempAvg = t;
+      sensorData.valid = true;
+      Serial.println("[SENSOR] Lectura OK!");
+    } else {
+      Serial.printf("[SENSOR] ERROR - valor invalido: %.2f\n", t);
+      sensorData.valid = false;
+    }
+    
+    // Volver a modo no bloqueante para el loop
+    ds18b20.setWaitForConversion(false);
+  } else {
+    Serial.println("[SENSOR] ERROR: No se detectaron sensores DS18B20!");
+    Serial.println("[SENSOR] Verificar: PIN, resistencia 4.7k, conexiones");
+  }
   
   if (config.dht22Enabled) {
     dht.begin();
     Serial.println("[OK] DHT22 inicializado");
   }
   
-  sensorData.sensorCount = count;
+  Serial.println("[SENSOR] Inicializacion completa");
+  Serial.flush();
 }
 
 void loadConfig() {
-  prefs.begin("rift", false);
+  prefs.begin("reefer", false);
   
   config.tempMax = prefs.getFloat("tempMax", DEFAULT_TEMP_MAX);
   config.tempCritical = prefs.getFloat("tempCrit", DEFAULT_TEMP_CRITICAL);
   config.alertDelaySec = prefs.getInt("alertDelay", DEFAULT_ALERT_DELAY_SEC);
   config.doorOpenMaxSec = prefs.getInt("doorMax", DEFAULT_DOOR_OPEN_MAX_SEC);
+  config.defrostCooldownSec = prefs.getInt("defrostCD", 1800);  // 30 minutos default
+  config.defrostRelayNC = prefs.getBool("defrostNC", false);    // Normal Abierto por default
   config.relayEnabled = prefs.getBool("relayEn", true);
   config.buzzerEnabled = prefs.getBool("buzzerEn", true);
   config.telegramEnabled = prefs.getBool("telegramEn", true);
+  config.supabaseEnabled = prefs.getBool("supabaseEn", false);  // Deshabilitado por defecto
   config.sensor1Enabled = prefs.getBool("sensor1", SENSOR_DS18B20_1_ENABLED);
   config.sensor2Enabled = prefs.getBool("sensor2", SENSOR_DS18B20_2_ENABLED);
   config.dht22Enabled = prefs.getBool("dht22", SENSOR_DHT22_ENABLED);
@@ -314,9 +399,12 @@ void saveConfig() {
   prefs.putFloat("tempCrit", config.tempCritical);
   prefs.putInt("alertDelay", config.alertDelaySec);
   prefs.putInt("doorMax", config.doorOpenMaxSec);
+  prefs.putInt("defrostCD", config.defrostCooldownSec);
+  prefs.putBool("defrostNC", config.defrostRelayNC);
   prefs.putBool("relayEn", config.relayEnabled);
   prefs.putBool("buzzerEn", config.buzzerEnabled);
   prefs.putBool("telegramEn", config.telegramEnabled);
+  prefs.putBool("supabaseEn", config.supabaseEnabled);
   prefs.putBool("sensor1", config.sensor1Enabled);
   prefs.putBool("sensor2", config.sensor2Enabled);
   prefs.putBool("dht22", config.dht22Enabled);
@@ -365,6 +453,44 @@ void saveConfigCallback() {
   Serial.println("[WIFI] Configuración WiFi guardada");
 }
 
+// ============================================
+// UDP DISCOVERY - Para que la app encuentre el ESP32
+// ============================================
+void initUdpDiscovery() {
+  udpDiscovery.begin(UDP_DISCOVERY_PORT);
+  Serial.printf("[OK] UDP Discovery escuchando en puerto %d\n", UDP_DISCOVERY_PORT);
+}
+
+void handleUdpDiscovery() {
+  int packetSize = udpDiscovery.parsePacket();
+  if (packetSize > 0) {
+    char buffer[64];
+    int len = udpDiscovery.read(buffer, sizeof(buffer) - 1);
+    if (len > 0) {
+      buffer[len] = '\0';
+      
+      // Verificar si es un mensaje de discovery
+      if (strcmp(buffer, UDP_DISCOVERY_MAGIC) == 0) {
+        Serial.printf("[UDP] Discovery request de %s:%d\n", 
+                      udpDiscovery.remoteIP().toString().c_str(), 
+                      udpDiscovery.remotePort());
+        
+        // Responder con nuestra IP y datos
+        String response = String(UDP_DISCOVERY_RESPONSE) + "|" + 
+                          state.localIP + "|" + 
+                          DEVICE_ID + "|" + 
+                          DEVICE_NAME;
+        
+        udpDiscovery.beginPacket(udpDiscovery.remoteIP(), udpDiscovery.remotePort());
+        udpDiscovery.print(response);
+        udpDiscovery.endPacket();
+        
+        Serial.printf("[UDP] Respondido: %s\n", response.c_str());
+      }
+    }
+  }
+}
+
 void reconnectWiFi() {
   static unsigned long lastAttempt = 0;
   if (millis() - lastAttempt < 30000) return;
@@ -397,68 +523,48 @@ void setupMDNS() {
 // LECTURA DE SENSORES
 // ============================================
 void readSensors() {
+  static unsigned long lastLog = 0;
+  
   if (config.simulationMode) {
     // Modo simulación
     sensorData.temp1 = config.simTemp1 + (random(-10, 10) / 10.0);
     sensorData.temp2 = config.simTemp2 + (random(-10, 10) / 10.0);
+    sensorData.tempAvg = sensorData.temp1;
     sensorData.valid = true;
   } else {
-    // Lectura real
+    // Lectura real de DS18B20
     ds18b20.requestTemperatures();
+    delay(750);  // Esperar conversión completa
     
-    float t1 = -999, t2 = -999;
-    int validCount = 0;
-    float sum = 0;
-    
-    if (config.sensor1Enabled && sensorData.sensorCount >= 1) {
-      t1 = ds18b20.getTempCByIndex(0);
-      if (t1 > -100 && t1 < 100) {
+    // SIEMPRE leer el sensor 1 si hay sensores detectados
+    if (sensorData.sensorCount > 0) {
+      float t1 = ds18b20.getTempCByIndex(0);
+      
+      // Log cada 10 segundos para no spamear
+      if (millis() - lastLog > 10000) {
+        Serial.printf("[LOOP] Temp: %.2f C\n", t1);
+        lastLog = millis();
+      }
+      
+      // Validar lectura
+      if (t1 > -55.0 && t1 < 125.0 && t1 != -127.0 && t1 != 85.0) {
         sensorData.temp1 = t1;
-        sum += t1;
-        validCount++;
+        sensorData.tempAvg = t1;
+        sensorData.valid = true;
+      } else {
+        Serial.printf("[LOOP] Lectura invalida: %.2f\n", t1);
+        sensorData.valid = false;
       }
+    } else {
+      sensorData.valid = false;
     }
-    
-    if (config.sensor2Enabled && sensorData.sensorCount >= 2) {
-      t2 = ds18b20.getTempCByIndex(1);
-      if (t2 > -100 && t2 < 100) {
-        sensorData.temp2 = t2;
-        sum += t2;
-        validCount++;
-      }
-    }
-    
-    if (config.dht22Enabled) {
-      float h = dht.readHumidity();
-      float t = dht.readTemperature();
-      if (!isnan(h) && !isnan(t)) {
-        sensorData.tempDHT = t;
-        sensorData.humidity = h;
-      }
-    }
-    
-    sensorData.valid = validCount > 0;
-    if (validCount > 0) {
-      sensorData.tempAvg = sum / validCount;
-    }
-  }
-  
-  // Calcular promedio
-  if (config.sensor1Enabled && config.sensor2Enabled) {
-    sensorData.tempAvg = (sensorData.temp1 + sensorData.temp2) / 2.0;
-  } else if (config.sensor1Enabled) {
-    sensorData.tempAvg = sensorData.temp1;
-  } else if (config.sensor2Enabled) {
-    sensorData.tempAvg = sensorData.temp2;
   }
   
   // Leer puerta (solo si está habilitado el sensor)
   bool doorNow = false;
   if (config.simulationMode) {
-    // En modo simulación, usar el estado simulado
     doorNow = config.simDoorOpen;
   } else if (config.doorEnabled) {
-    // Solo leer el sensor si está habilitado
     doorNow = digitalRead(PIN_DOOR_SENSOR) == HIGH;
   }
   // Si el sensor de puerta está deshabilitado, siempre reportar cerrada
@@ -489,6 +595,18 @@ void checkInternet() {
 void checkAlerts() {
   if (!sensorData.valid) return;
   
+  // *** MODO DESCONGELAMIENTO - Ignorar TODAS las alertas ***
+  if (state.defrostMode) {
+    // Solo mostrar en log cada 30 segundos
+    static unsigned long lastDefrostLog = 0;
+    if (millis() - lastDefrostLog > 30000) {
+      unsigned long defrostMin = (millis() - state.defrostStartTime) / 60000;
+      Serial.printf("[DESCONGELAMIENTO] Modo activo hace %lu minutos - Alertas deshabilitadas\n", defrostMin);
+      lastDefrostLog = millis();
+    }
+    return;  // No verificar alertas
+  }
+  
   float temp = sensorData.tempAvg;
   bool doorOpen = sensorData.doorOpen;
   
@@ -501,34 +619,41 @@ void checkAlerts() {
     return;
   }
   
-  // Verificar temperatura
+  // Verificar temperatura - SOLO usar tempCritical
   if (temp > config.tempCritical) {
+    // Temperatura sobre el límite crítico
     if (state.highTempStartTime == 0) {
       state.highTempStartTime = millis();
+      Serial.printf("[ALERTA] Temp %.1f > %.1f - Esperando %d segundos...\n", 
+                    temp, config.tempCritical, config.alertDelaySec);
     }
+    
     unsigned long highTempSec = (millis() - state.highTempStartTime) / 1000;
     
-    if (highTempSec >= config.alertDelaySec) {
-      triggerAlert("🚨 CRÍTICO: " + String(temp, 1) + "°C (máx: " + String(config.tempCritical, 1) + "°C)", true);
+    // Solo activar alarma si:
+    // 1. Pasó el tiempo de espera
+    // 2. No hay alerta activa
+    // 3. No fue silenciada (acknowledged) - solo se resetea cuando temp vuelve a normal
+    if (highTempSec >= config.alertDelaySec && !state.alertActive && !state.alertAcknowledged) {
+      triggerAlert("🚨 ALERTA: " + String(temp, 1) + "°C (límite: " + String(config.tempCritical, 1) + "°C)", true);
     }
-  } else if (temp > config.tempMax) {
-    if (state.highTempStartTime == 0) {
-      state.highTempStartTime = millis();
-    }
-    unsigned long highTempSec = (millis() - state.highTempStartTime) / 1000;
     
-    if (highTempSec >= config.alertDelaySec) {
-      triggerAlert("⚠️ Advertencia: " + String(temp, 1) + "°C (máx: " + String(config.tempMax, 1) + "°C)", false);
+    // Mantener relé encendido mientras temp esté alta Y haya alerta activa (no silenciada)
+    if (state.alertActive && !state.alertAcknowledged && config.relayEnabled && !state.relayState) {
+      setRelay(true);
     }
   } else {
-    // Temperatura normal
+    // Temperatura normal (bajo el límite) - RESETEAR TODO
     state.highTempStartTime = 0;
-    // Solo auto-desactivar si NO es una alerta manual
-    if (state.alertActive && !manualAlert) {
+    state.alertAcknowledged = false;  // Ahora sí puede volver a sonar
+    if (state.alertActive) {
       clearAlert();
     }
   }
 }
+
+// Variable para trackear si ya se envió alerta a Telegram en esta sesión de alerta
+bool telegramAlertSent = false;
 
 void triggerAlert(String message, bool critical) {
   // Si ya hay una alerta activa, no hacer nada (evita spam)
@@ -553,7 +678,7 @@ void triggerAlert(String message, bool critical) {
   }
   
   // Supabase
-  sendAlertToSupabase(critical ? "critical" : "warning", message);
+  sendAlertToSupabase("temperature", critical ? "critical" : "warning", message);
 }
 
 void clearAlert() {
@@ -570,20 +695,17 @@ void clearAlert() {
 }
 
 void acknowledgeAlert() {
-  // DETENER TODO - Poner estado en false para que todas las apps lo vean
-  state.alertActive = false;
-  state.criticalAlert = false;
-  state.alertMessage = "";
-  state.highTempStartTime = 0;
-  telegramAlertSent = false;  // Resetear para permitir nueva alerta en el futuro
-  manualAlert = false;  // Resetear flag de alerta manual
+  // SILENCIAR - Marcar como acknowledged pero mantener alerta visual
+  state.alertAcknowledged = true;  // No volver a sonar hasta que temp vuelva a normal
   
-  // Apagar relay y buzzer
+  // Apagar relay y buzzer (silenciar sonido)
   setRelay(false);
   digitalWrite(PIN_BUZZER, LOW);
-  digitalWrite(PIN_LED_ALERT, LOW);
   
-  Serial.println("[ALERTA] *** DETENIDA por usuario ***");
+  // MANTENER alertActive = true para que la app siga mostrando alerta visual
+  // Solo se limpia cuando la temperatura vuelve a la normalidad
+  
+  Serial.println("[ALERTA] *** SILENCIADA por usuario - esperando temp normal para resetear ***");
 }
 
 // ============================================
@@ -659,8 +781,8 @@ void sendTelegramAlert(String message) {
 
 void sendTelegramMessage(String message) {
   if (strlen(TELEGRAM_BOT_TOKEN) < 10) return;
-  // Cooldown de 30 MINUTOS entre mensajes de Telegram para no spamear
-  if (millis() - state.lastTelegramAlert < 1800000) return;  // 30 min = 1800000 ms
+  // Cooldown de 5 MINUTOS entre mensajes de Telegram
+  if (millis() - state.lastTelegramAlert < 300000) return;  // 5 min = 300000 ms
   
   HTTPClient http;
   String url = "https://api.telegram.org/bot" + String(TELEGRAM_BOT_TOKEN) + "/sendMessage";
@@ -686,75 +808,13 @@ void sendTelegramMessage(String message) {
 }
 
 // ============================================
-// SUPABASE - SYNC EN TIEMPO REAL (cada 5 seg)
+// SUPABASE - Envío de lecturas cada 5 segundos
 // ============================================
-unsigned long lastSupabaseSync = 0;
-bool deviceRegistered = false;
 
-// Registrar dispositivo en Supabase (una sola vez)
-void registerDeviceInSupabase() {
-  if (!state.internetAvailable || deviceRegistered) return;
-  if (strlen(SUPABASE_URL) < 10) return;
-  
-  HTTPClient http;
-  
-  // Primero intentar actualizar si ya existe
-  String url = String(SUPABASE_URL) + "/rest/v1/devices?device_id=eq." + String(DEVICE_ID);
-  
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("apikey", SUPABASE_ANON_KEY);
-  http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
-  http.addHeader("Prefer", "return=minimal");
-  
-  StaticJsonDocument<512> doc;
-  doc["device_id"] = DEVICE_ID;
-  doc["name"] = DEVICE_NAME;
-  doc["location"] = LOCATION_NAME;
-  doc["location_detail"] = LOCATION_DETAIL;
-  doc["latitude"] = LOCATION_LAT;
-  doc["longitude"] = LOCATION_LON;
-  doc["is_online"] = true;
-  doc["firmware_version"] = "2.0";
-  
-  String body;
-  serializeJson(doc, body);
-  
-  int code = http.PATCH(body);
-  
-  if (code == 200 || code == 204) {
-    deviceRegistered = true;
-    Serial.println("[SUPABASE] Dispositivo actualizado");
-  } else {
-    // Si no existe, crear nuevo
-    http.end();
-    url = String(SUPABASE_URL) + "/rest/v1/devices";
-    http.begin(url);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("apikey", SUPABASE_ANON_KEY);
-    http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
-    http.addHeader("Prefer", "return=minimal");
-    
-    code = http.POST(body);
-    if (code == 201) {
-      deviceRegistered = true;
-      Serial.println("[SUPABASE] Dispositivo registrado");
-    } else {
-      Serial.printf("[SUPABASE] Error registro: %d\n", code);
-    }
-  }
-  http.end();
-}
-
-// Enviar lectura a Supabase (cada 5 segundos)
-void syncToSupabase() {
-  if (millis() - lastSupabaseSync < SUPABASE_SYNC_INTERVAL_MS) return;
-  if (!state.internetAvailable) return;
-  if (strlen(SUPABASE_URL) < 10) return;
-  
-  // Registrar dispositivo si no está registrado
-  if (!deviceRegistered) {
-    registerDeviceInSupabase();
+// Enviar lectura a Supabase (tabla readings)
+bool supabaseSendReading() {
+  if (!config.supabaseEnabled || !state.internetAvailable) {
+    return false;
   }
   
   HTTPClient http;
@@ -766,14 +826,13 @@ void syncToSupabase() {
   http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
   http.addHeader("Prefer", "return=minimal");
   
-  StaticJsonDocument<384> doc;
+  StaticJsonDocument<512> doc;
   doc["device_id"] = DEVICE_ID;
   doc["temp1"] = sensorData.temp1;
   doc["temp2"] = sensorData.temp2;
   doc["temp_avg"] = sensorData.tempAvg;
   doc["humidity"] = sensorData.humidity;
   doc["door_open"] = sensorData.doorOpen;
-  doc["door_open_seconds"] = sensorData.doorOpen ? (millis() - sensorData.doorOpenSince) / 1000 : 0;
   doc["relay_on"] = state.relayState;
   doc["alert_active"] = state.alertActive;
   doc["simulation_mode"] = config.simulationMode;
@@ -782,20 +841,35 @@ void syncToSupabase() {
   serializeJson(doc, body);
   
   int code = http.POST(body);
-  if (code == 201) {
-    Serial.println("[SUPABASE] ✓ Lectura enviada");
-  } else {
-    Serial.printf("[SUPABASE] Error: %d\n", code);
-  }
   http.end();
   
-  lastSupabaseSync = millis();
+  if (code == 201 || code == 200) {
+    Serial.println("[SUPABASE] ✓ Lectura enviada");
+    return true;
+  } else {
+    Serial.printf("[SUPABASE] ✗ Error: %d\n", code);
+    return false;
+  }
 }
 
-// Enviar alerta a Supabase
-void sendAlertToSupabase(String severity, String message) {
-  if (!state.internetAvailable) return;
-  if (strlen(SUPABASE_URL) < 10) return;
+// Sincronización periódica con Supabase
+void supabaseSync() {
+  if (!config.supabaseEnabled) return;
+  
+  unsigned long now = millis();
+  
+  // Enviar lectura cada SUPABASE_SYNC_INTERVAL (5 segundos)
+  if (now - state.lastSupabaseSync >= SUPABASE_SYNC_INTERVAL) {
+    state.lastSupabaseSync = now;
+    
+    if (state.internetAvailable) {
+      supabaseSendReading();
+    }
+  }
+}
+
+void sendAlertToSupabase(String alertType, String severity, String message) {
+  if (!config.supabaseEnabled || !state.internetAvailable) return;
   
   HTTPClient http;
   String url = String(SUPABASE_URL) + "/rest/v1/alerts";
@@ -806,67 +880,21 @@ void sendAlertToSupabase(String severity, String message) {
   http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
   http.addHeader("Prefer", "return=minimal");
   
-  StaticJsonDocument<384> doc;
+  StaticJsonDocument<256> doc;
   doc["device_id"] = DEVICE_ID;
-  doc["alert_type"] = "temperature";
+  doc["alert_type"] = alertType;
   doc["severity"] = severity;
   doc["message"] = message;
-  doc["temp_value"] = sensorData.tempAvg;
   
   String body;
   serializeJson(doc, body);
   
   int code = http.POST(body);
-  if (code == 201) {
-    Serial.println("[SUPABASE] Alerta registrada");
-  }
   http.end();
-}
-
-// Verificar comandos pendientes desde la nube
-void checkCloudCommands() {
-  if (!state.internetAvailable) return;
-  if (strlen(SUPABASE_URL) < 10) return;
   
-  HTTPClient http;
-  String url = String(SUPABASE_URL) + "/rest/v1/commands?device_id=eq." + String(DEVICE_ID) + "&executed=eq.false&order=created_at.asc&limit=1";
-  
-  http.begin(url);
-  http.addHeader("apikey", SUPABASE_ANON_KEY);
-  http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
-  
-  int code = http.GET();
-  if (code == 200) {
-    String response = http.getString();
-    
-    StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, response);
-    
-    if (!error && doc.size() > 0) {
-      JsonObject cmd = doc[0];
-      String command = cmd["command"].as<String>();
-      int cmdId = cmd["id"];
-      
-      Serial.printf("[CLOUD] Comando recibido: %s\n", command.c_str());
-      
-      // Ejecutar comando
-      if (command == "stop_alert") {
-        acknowledgeAlert();
-      } else if (command == "toggle_relay") {
-        setRelay(!state.relayState);
-      }
-      
-      // Marcar como ejecutado
-      http.end();
-      url = String(SUPABASE_URL) + "/rest/v1/commands?id=eq." + String(cmdId);
-      http.begin(url);
-      http.addHeader("Content-Type", "application/json");
-      http.addHeader("apikey", SUPABASE_ANON_KEY);
-      http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
-      http.PATCH("{\"executed\":true}");
-    }
+  if (code == 201 || code == 200) {
+    Serial.println("[SUPABASE] ✓ Alerta enviada");
   }
-  http.end();
 }
 
 // ============================================
@@ -884,9 +912,8 @@ void setupWebServer() {
   server.on("/api/telegram/test", HTTP_POST, handleApiTelegramTest);
   server.on("/api/simulation", HTTP_POST, handleApiSimulation);
   server.on("/api/door/toggle", HTTP_POST, handleApiToggleDoor);
+  server.on("/api/defrost", HTTP_POST, handleApiDefrost);
   server.on("/api/wifi/reset", HTTP_POST, handleApiWifiReset);
-  server.on("/api/ping", HTTP_POST, handleApiPing);
-  server.on("/api/ping", HTTP_GET, handleApiPing);
   server.onNotFound(handleNotFound);
   
   Serial.println("[OK] Web server configurado");
@@ -920,6 +947,7 @@ void handleApiStatus() {
   // System state
   JsonObject sys = doc.createNestedObject("system");
   sys["alert_active"] = state.alertActive;
+  sys["alert_acknowledged"] = state.alertAcknowledged;
   sys["critical"] = state.criticalAlert;
   sys["alert_message"] = state.alertMessage;
   sys["relay_on"] = state.relayState;
@@ -933,8 +961,9 @@ void handleApiStatus() {
   sys["door_enabled"] = config.doorEnabled;
   sys["sensor1_enabled"] = config.sensor1Enabled;
   sys["sensor2_enabled"] = config.sensor2Enabled;
-  sys["android_connections"] = androidConnections;
-  sys["last_android_ping"] = lastAndroidPing > 0 ? (millis() - lastAndroidPing) / 1000 : -1;
+  sys["defrost_mode"] = state.defrostMode;
+  sys["defrost_minutes"] = state.defrostMode ? (millis() - state.defrostStartTime) / 60000 : 0;
+  sys["supabase_enabled"] = config.supabaseEnabled;
   
   // Device info
   JsonObject device = doc.createNestedObject("device");
@@ -977,9 +1006,12 @@ void handleApiGetConfig() {
   doc["temp_critical"] = config.tempCritical;
   doc["alert_delay_sec"] = config.alertDelaySec;
   doc["door_open_max_sec"] = config.doorOpenMaxSec;
+  doc["defrost_cooldown_sec"] = config.defrostCooldownSec;
+  doc["defrost_relay_nc"] = config.defrostRelayNC;
   doc["relay_enabled"] = config.relayEnabled;
   doc["buzzer_enabled"] = config.buzzerEnabled;
   doc["telegram_enabled"] = config.telegramEnabled;
+  doc["supabase_enabled"] = config.supabaseEnabled;
   doc["sensor1_enabled"] = config.sensor1Enabled;
   doc["sensor2_enabled"] = config.sensor2Enabled;
   doc["dht22_enabled"] = config.dht22Enabled;
@@ -1014,9 +1046,12 @@ void handleApiSetConfig() {
   if (doc.containsKey("temp_critical")) config.tempCritical = doc["temp_critical"];
   if (doc.containsKey("alert_delay_sec")) config.alertDelaySec = doc["alert_delay_sec"];
   if (doc.containsKey("door_open_max_sec")) config.doorOpenMaxSec = doc["door_open_max_sec"];
+  if (doc.containsKey("defrost_cooldown_sec")) config.defrostCooldownSec = doc["defrost_cooldown_sec"];
+  if (doc.containsKey("defrost_relay_nc")) config.defrostRelayNC = doc["defrost_relay_nc"];
   if (doc.containsKey("relay_enabled")) config.relayEnabled = doc["relay_enabled"];
   if (doc.containsKey("buzzer_enabled")) config.buzzerEnabled = doc["buzzer_enabled"];
   if (doc.containsKey("telegram_enabled")) config.telegramEnabled = doc["telegram_enabled"];
+  if (doc.containsKey("supabase_enabled")) config.supabaseEnabled = doc["supabase_enabled"];
   if (doc.containsKey("sensor1_enabled")) config.sensor1Enabled = doc["sensor1_enabled"];
   if (doc.containsKey("sensor2_enabled")) config.sensor2Enabled = doc["sensor2_enabled"];
   if (doc.containsKey("dht22_enabled")) config.dht22Enabled = doc["dht22_enabled"];
@@ -1025,6 +1060,9 @@ void handleApiSetConfig() {
   if (doc.containsKey("sim_temp1")) config.simTemp1 = doc["sim_temp1"];
   if (doc.containsKey("sim_temp2")) config.simTemp2 = doc["sim_temp2"];
   if (doc.containsKey("sim_door_open")) config.simDoorOpen = doc["sim_door_open"];
+  
+  Serial.printf("[CONFIG] Guardado: tempCritical=%.1f, alertDelay=%d sec, defrostCooldown=%d sec, defrostNC=%d\n",
+                config.tempCritical, config.alertDelaySec, config.defrostCooldownSec, config.defrostRelayNC);
   
   saveConfig();
   
@@ -1059,7 +1097,6 @@ void handleApiAckAlert() {
 }
 
 void handleApiTestAlert() {
-  manualAlert = true;  // Marcar como alerta manual para que no se auto-desactive
   triggerAlert("🔔 ALERTA DE PRUEBA - Sistema funcionando correctamente", true);
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", "{\"success\":true}");
@@ -1117,22 +1154,49 @@ void handleApiToggleDoor() {
   server.send(200, "application/json", "{\"success\":true,\"door_open\":" + String(config.simDoorOpen ? "true" : "false") + "}");
 }
 
+void handleApiDefrost() {
+  state.defrostMode = !state.defrostMode;
+  
+  if (state.defrostMode) {
+    // Activando modo descongelamiento
+    state.defrostStartTime = millis();
+    // Detener cualquier alerta activa
+    state.alertActive = false;
+    state.criticalAlert = false;
+    state.alertMessage = "";
+    setRelay(false);
+    digitalWrite(PIN_BUZZER, LOW);
+    digitalWrite(PIN_LED_ALERT, LOW);
+    
+    Serial.println("[DESCONGELAMIENTO] *** MODO ACTIVADO - Alertas deshabilitadas ***");
+    
+    // Notificación simple a Telegram
+    if (state.internetAvailable && config.telegramEnabled) {
+      sendTelegramMessage("🧊 *MODO DESCONGELAMIENTO ACTIVADO*\n\n⚠️ Las alertas están deshabilitadas temporalmente.\n\n📍 " + String(LOCATION_DETAIL));
+    }
+  } else {
+    // Desactivando modo descongelamiento
+    unsigned long defrostMin = (millis() - state.defrostStartTime) / 60000;
+    state.defrostStartTime = 0;
+    telegramAlertSent = false;  // Permitir nuevas alertas
+    
+    Serial.printf("[DESCONGELAMIENTO] *** MODO DESACTIVADO - Duró %lu minutos ***\n", defrostMin);
+    
+    // Notificación simple a Telegram
+    if (state.internetAvailable && config.telegramEnabled) {
+      sendTelegramMessage("✅ *MODO DESCONGELAMIENTO FINALIZADO*\n\n🔔 Las alertas están activas nuevamente.\n⏱️ Duración: " + String(defrostMin) + " minutos\n\n📍 " + String(LOCATION_DETAIL));
+    }
+  }
+  
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", "{\"success\":true,\"defrost_mode\":" + String(state.defrostMode ? "true" : "false") + "}");
+}
+
 void handleApiWifiReset() {
   server.send(200, "application/json", "{\"success\":true,\"message\":\"Reiniciando en modo AP...\"}");
   delay(1000);
   wifiManager.resetSettings();
   ESP.restart();
-}
-
-void handleApiPing() {
-  // Registrar conexión de app Android
-  androidConnections++;
-  lastAndroidPing = millis();
-  appConnected = true;
-  lastAppConnection = millis();
-  
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200, "application/json", "{\"success\":true,\"android_connections\":" + String(androidConnections) + "}");
 }
 
 void handleNotFound() {
@@ -1157,378 +1221,243 @@ String getEmbeddedHTML() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reefer Monitor Pro</title>
+  <title>Alerta REEFER</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);min-height:100vh;color:#fff;padding:16px}
-    .container{max-width:900px;margin:0 auto}
-    h1{text-align:center;margin-bottom:8px;font-size:2em}
-    h1 span{background:linear-gradient(90deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .subtitle{text-align:center;color:#64748b;margin-bottom:24px}
-    .card{background:rgba(30,41,59,0.8);border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.1)}
-    .card h2{margin-bottom:16px;color:#f1f5f9;font-size:1.1em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    @media(max-width:600px){.status-grid{grid-template-columns:repeat(2,1fr)}}
-    .status-item{background:rgba(0,0,0,0.3);padding:16px;border-radius:12px;text-align:center}
-    .status-item .value{font-size:1.8em;font-weight:bold;margin:8px 0}
-    .status-item .label{color:#94a3b8;font-size:0.75em;text-transform:uppercase}
-    .temp-ok{color:#22d3ee;text-shadow:0 0 15px rgba(34,211,238,0.4)}
-    .temp-warn{color:#fbbf24;text-shadow:0 0 15px rgba(251,191,36,0.4);animation:pulse 1s infinite}
-    .temp-crit{color:#ef4444;text-shadow:0 0 15px rgba(239,68,68,0.4);animation:pulse .5s infinite}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;min-height:100vh;color:#fff;padding:16px}
+    .container{max-width:500px;margin:0 auto}
+    h1{text-align:center;margin-bottom:4px;font-size:1.8em;color:#60a5fa}
+    .subtitle{text-align:center;color:#64748b;margin-bottom:20px;font-size:.9em}
+    .card{background:#1e293b;border-radius:12px;padding:16px;margin-bottom:12px}
+    .card h2{margin-bottom:12px;color:#fff;font-size:1em;display:flex;align-items:center;gap:8px}
+    .temp-big{text-align:center;font-size:4em;font-weight:bold;margin:16px 0}
+    .temp-ok{color:#22d3ee}
+    .temp-warn{color:#fbbf24}
+    .temp-crit{color:#ef4444;animation:pulse .5s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
-    .controls{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
-    @media(max-width:500px){.controls{grid-template-columns:1fr}}
-    button{padding:14px;border:none;border-radius:12px;font-size:.95em;font-weight:600;cursor:pointer;transition:all .2s}
-    button:active{transform:scale(.98)}
-    button:disabled{opacity:0.5;cursor:not-allowed}
-    .btn-cyan{background:linear-gradient(135deg,#22d3ee,#06b6d4);color:#0f172a}
-    .btn-yellow{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0f172a}
-    .btn-red{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff}
-    .btn-green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
-    .btn-purple{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff}
-    .btn-gray{background:linear-gradient(135deg,#475569,#334155);color:#fff}
-    .btn-blue{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}
-    .btn-orange{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff}
-    .slider-container{margin:16px 0}
-    .slider-value{text-align:center;font-size:2.5em;font-weight:bold;margin:8px 0}
-    input[type="range"]{width:100%;height:10px;border-radius:5px;background:linear-gradient(90deg,#22d3ee 0%,#fbbf24 50%,#ef4444 100%);-webkit-appearance:none;cursor:pointer}
-    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-    .alert-banner{background:linear-gradient(90deg,#ef4444,#dc2626);padding:16px;border-radius:12px;text-align:center;margin-bottom:16px;display:none;animation:alert-pulse .5s infinite alternate}
+    .status-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #334155}
+    .status-row:last-child{border-bottom:none}
+    .status-label{color:#94a3b8}
+    .status-value{font-weight:bold}
+    .alert-banner{background:#ef4444;padding:16px;border-radius:12px;text-align:center;margin-bottom:12px;display:none}
     .alert-banner.active{display:block}
-    .alert-banner h3{margin-bottom:8px}
-    @keyframes alert-pulse{0%{box-shadow:0 0 20px rgba(239,68,68,.5)}100%{box-shadow:0 0 40px rgba(239,68,68,.8)}}
-    .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:.7em;font-weight:bold;margin-left:8px}
-    .badge-online{background:#22c55e}
-    .badge-sim{background:#8b5cf6}
-    .badge-real{background:#3b82f6}
-    .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    @media(max-width:600px){.two-cols{grid-template-columns:1fr}}
-    .mode-btns{display:flex;gap:10px;margin-bottom:16px}
-    .mode-btns button{flex:1;padding:12px}
-    .mode-btn-active{box-shadow:0 0 0 3px rgba(255,255,255,0.5)}
-    .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px;background:rgba(0,0,0,0.2);border-radius:10px;margin-bottom:8px}
-    .toggle-row .label{font-weight:500}
-    .toggle{width:50px;height:28px;background:#475569;border-radius:14px;position:relative;cursor:pointer;transition:background .3s}
-    .toggle.on{background:#22c55e}
-    .toggle::after{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .3s}
-    .toggle.on::after{left:25px}
-    .info-box{background:rgba(59,130,246,.15);padding:16px;border-radius:12px;border:1px solid rgba(59,130,246,.3)}
-    .info-box code{background:rgba(0,0,0,.3);padding:6px 12px;border-radius:6px;font-weight:bold;color:#60a5fa}
-    .input-row{margin-bottom:16px}
-    .input-row label{display:block;margin-bottom:8px;color:#94a3b8;font-size:.9em}
-    .input-group{display:flex;align-items:center;gap:8px}
-    .input-group input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:1.1em;font-weight:bold}
-    .input-group span{color:#64748b;min-width:40px}
+    .alert-banner.silenced{background:#f97316}
+    button{width:100%;padding:14px;border:none;border-radius:10px;font-size:1em;font-weight:600;cursor:pointer;margin-top:8px}
+    .btn-green{background:#22c55e;color:#fff}
+    .btn-blue{background:#3b82f6;color:#fff}
+    .btn-orange{background:#f97316;color:#fff}
+    .btn-red{background:#ef4444;color:#fff}
+    .input-row{margin-bottom:12px}
+    .input-row label{display:block;margin-bottom:6px;color:#94a3b8;font-size:.85em}
+    .input-group{display:flex;gap:8px}
+    .input-group input{flex:1;padding:12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;font-size:1em}
+    .input-group span{color:#64748b;padding:12px 0;min-width:40px}
+    .config-value{background:#0f172a;padding:8px 12px;border-radius:6px;margin-top:4px;font-size:.9em}
+    .footer{text-align:center;padding:20px;color:#64748b;font-size:.75em}
+    .footer strong{color:#94a3b8}
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>❄️ Reefer <span>Monitor Pro</span></h1>
-    <p class="subtitle">Campamento Parametican Silver</p>
+    <h1>❄️ Alerta REEFER</h1>
+    <p class="subtitle">PANDEMONIUM TECH × PAN AMERICAN SILVER</p>
     
     <div class="alert-banner" id="alertBanner">
-      <h3>🚨 ¡ALERTA ACTIVA!</h3>
-      <div id="alertMsg">Temperatura fuera de rango</div>
-      <button class="btn-green" onclick="stopAlert()" style="margin-top:12px;font-size:1.1em;padding:16px 32px">🛑 DETENER ALERTA</button>
+      <div style="font-size:1.2em;font-weight:bold">🚨 ALERTA ACTIVA</div>
+      <div id="alertMsg" style="margin:8px 0">Temperatura crítica</div>
+      <button class="btn-green" onclick="stopAlert()">🛑 DETENER ALERTA</button>
     </div>
     
     <div class="card">
-      <h2>⚙️ Modo de Operación</h2>
-      <div class="mode-btns">
-        <button id="btnModoReal" class="btn-blue" onclick="setMode(false)">📡 MODO REAL</button>
-        <button id="btnModoSim" class="btn-purple" onclick="setMode(true)">🧪 MODO SIMULACIÓN</button>
-      </div>
+      <h2>🌡️ TEMPERATURA</h2>
+      <div class="temp-big temp-ok" id="temp">--.-°C</div>
     </div>
     
     <div class="card">
-      <h2>📊 Estado en Tiempo Real <span class="badge badge-online">ONLINE</span><span class="badge" id="modeBadge">REAL</span></h2>
-      <div class="status-grid">
-        <div class="status-item">
-          <div class="label">Temperatura</div>
-          <div class="value temp-ok" id="temp">-22.5°C</div>
-        </div>
-        <div class="status-item">
-          <div class="label">Puerta</div>
-          <div class="value" id="door">🔒</div>
-          <div class="label" id="doorText">Cerrada</div>
-        </div>
-        <div class="status-item">
-          <div class="label">Sirena</div>
-          <div class="value" id="relay">⚫</div>
-          <div class="label" id="relayText">Apagada</div>
-        </div>
-        <div class="status-item">
-          <div class="label">Uptime</div>
-          <div class="value" id="uptime" style="font-size:1.3em">0:00</div>
-        </div>
+      <h2>📊 Estado del Sistema</h2>
+      <div class="status-row">
+        <span class="status-label">Puerta</span>
+        <span class="status-value" id="doorStatus">Inhabilitado</span>
       </div>
-    </div>
-    
-    <div class="two-cols">
-      <div class="card" id="simControls">
-        <h2>🌡️ Control de Temperatura</h2>
-        <div class="slider-container">
-          <div class="slider-value temp-ok" id="sliderValue">-22.5°C</div>
-          <input type="range" id="tempSlider" min="-40" max="10" step="0.5" value="-22.5">
-          <div style="display:flex;justify-content:space-between;color:#64748b;font-size:.75em;margin-top:4px">
-            <span>-40°C</span><span>-18°C (límite)</span><span>+10°C</span>
-          </div>
-        </div>
-        <div class="controls">
-          <button class="btn-cyan" onclick="setTemp(-25)">❄️ -25°C</button>
-          <button class="btn-yellow" onclick="setTemp(-15)">⚠️ -15°C</button>
-          <button class="btn-red" onclick="setTemp(-5)">🔥 -5°C</button>
-          <button class="btn-gray" onclick="setTemp(-22)">🔄 Normal</button>
-        </div>
+      <div class="status-row">
+        <span class="status-label">Sirena</span>
+        <span class="status-value" id="relayStatus">Apagada</span>
       </div>
-      
-      <div class="card">
-        <h2>🎛️ Controles</h2>
-        <div class="controls" style="grid-template-columns:1fr">
-          <button class="btn-purple" id="btnDoor" onclick="toggleDoor()">🚪 Puerta: CERRADA</button>
-          <button class="btn-red" id="btnAlert" onclick="toggleAlert()">🚨 Activar Alerta</button>
-          <button class="btn-gray" onclick="toggleRelay()">🔔 Toggle Sirena</button>
-        </div>
+      <div class="status-row">
+        <span class="status-label">Señal Descongelamiento</span>
+        <span class="status-value" id="defrostSignal">--</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Uptime</span>
+        <span class="status-value" id="uptime">--</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">WiFi</span>
+        <span class="status-value" id="wifiRssi">-- dBm</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Internet</span>
+        <span class="status-value" id="internetStatus">--</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">IP</span>
+        <span class="status-value" id="deviceIp">--</span>
       </div>
     </div>
     
     <div class="card">
-      <h2>🔧 Configuración de Sensores</h2>
-      <div class="toggle-row">
-        <span class="label">🌡️ Sensor Temperatura 1 (DS18B20)</span>
-        <div class="toggle" id="togSensor1" onclick="toggleSensor('sensor1')"></div>
+      <h2>📋 Valores Configurados</h2>
+      <div class="status-row">
+        <span class="status-label">🌡️ Temp. Crítica</span>
+        <span class="status-value" id="cfgTempCrit">--°C</span>
       </div>
-      <div class="toggle-row">
-        <span class="label">🌡️ Sensor Temperatura 2 (DS18B20)</span>
-        <div class="toggle" id="togSensor2" onclick="toggleSensor('sensor2')"></div>
+      <div class="status-row">
+        <span class="status-label">⏱️ Tiempo espera</span>
+        <span class="status-value" id="cfgAlertDelay">-- min</span>
       </div>
-      <div class="toggle-row">
-        <span class="label">🚪 Sensor Magnético de Puerta</span>
-        <div class="toggle" id="togDoor" onclick="toggleSensor('door')"></div>
+      <div class="status-row">
+        <span class="status-label">🧊 Post-descongelación</span>
+        <span class="status-value" id="cfgDefrostCooldown">-- min</span>
       </div>
-      <p style="color:#64748b;font-size:.8em;margin-top:12px">⚠️ Desactiva los sensores que NO tengas conectados para evitar falsas alarmas</p>
+      <div class="status-row">
+        <span class="status-label">🔌 Relé Descong.</span>
+        <span class="status-value" id="cfgDefrostRelay">--</span>
+      </div>
     </div>
     
     <div class="card">
-      <h2>🎚️ Umbrales de Alerta</h2>
+      <h2>⚙️ Configuración</h2>
       <div class="input-row">
-        <label>🌡️ Temperatura máxima (alertar si supera)</label>
+        <label>🌡️ Temperatura Crítica (°C)</label>
         <div class="input-group">
-          <input type="number" id="inTempMax" value="-18" step="0.5" min="-40" max="10">
+          <input type="number" id="inTempCrit" value="-10" step="0.5">
           <span>°C</span>
         </div>
       </div>
       <div class="input-row">
-        <label>🚪 Tiempo máximo puerta abierta</label>
+        <label>⏱️ Tiempo de espera (minutos)</label>
         <div class="input-group">
-          <input type="number" id="inDoorMax" value="180" step="10" min="10" max="600">
-          <span>seg</span>
+          <input type="number" id="inAlertDelay" value="5" step="1" min="1">
+          <span>min</span>
         </div>
       </div>
       <div class="input-row">
-        <label>⏱️ Tiempo antes de alertar (anti falsos positivos)</label>
+        <label>🧊 Post-descongelación (minutos)</label>
         <div class="input-group">
-          <input type="number" id="inAlertDelay" value="300" step="30" min="30" max="900">
-          <span>seg</span>
+          <input type="number" id="inDefrostCooldown" value="30" step="5" min="5">
+          <span>min</span>
         </div>
       </div>
-      <button class="btn-blue" onclick="saveThresholds()" style="width:100%;margin-top:16px">💾 Guardar Umbrales</button>
-      <p style="color:#64748b;font-size:.8em;margin-top:12px">Ejemplo: Si pones -20°C, la alerta saltará cuando la temperatura suba de -20°C</p>
+      <button class="btn-blue" onclick="saveConfig()">💾 GUARDAR</button>
+    </div>
+    
+    <div class="card" id="defrostCard">
+      <h2>🧊 Modo Descongelamiento</h2>
+      <div id="defrostStatus" style="display:none;background:#f97316;padding:10px;border-radius:8px;margin-bottom:10px;text-align:center">
+        ⏱️ Activo: <strong id="defrostTime">0</strong> min
+      </div>
+      <button class="btn-orange" id="btnDefrost" onclick="toggleDefrost()">🧊 ACTIVAR DESCONGELAMIENTO</button>
     </div>
     
     <div class="card">
-      <h2>📱 Telegram y WiFi</h2>
-      <div class="controls">
-        <button class="btn-blue" onclick="testTelegram()">📲 Probar Telegram</button>
-        <button class="btn-red" onclick="resetWifi()">📡 Reset WiFi</button>
-      </div>
+      <h2>📱 Acciones</h2>
+      <button class="btn-blue" onclick="testTelegram()">📲 Probar Telegram</button>
+      <button class="btn-red" onclick="resetWifi()" style="margin-top:8px">📡 Reset WiFi</button>
     </div>
     
-    <div class="card">
-      <h2>📱 Apps Android Conectadas</h2>
-      <div class="status-grid" style="grid-template-columns:repeat(2,1fr)">
-        <div class="status-item">
-          <div class="label">Conexiones Totales</div>
-          <div class="value" id="androidCount" style="color:#22c55e">0</div>
-        </div>
-        <div class="status-item">
-          <div class="label">Último Ping</div>
-          <div class="value" id="lastPing" style="font-size:1em">--</div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="card">
-      <h2>ℹ️ Información del Dispositivo</h2>
-      <div class="info-box">
-        <p><strong>ID:</strong> <code id="deviceId">REEFER-01</code></p>
-        <p style="margin-top:8px"><strong>IP:</strong> <code id="deviceIp">--</code></p>
-        <p style="margin-top:8px"><strong>mDNS:</strong> <code id="deviceMdns">reefer.local</code></p>
-        <p style="margin-top:8px"><strong>WiFi:</strong> <span id="wifiRssi">--</span> dBm</p>
-        <p style="margin-top:8px"><strong>Internet:</strong> <span id="internetStatus">--</span></p>
-      </div>
-    </div>
-    
-    <div style="text-align:center;padding:16px;color:#475569;font-size:.75em">
+    <div class="footer">
       <div>Última actualización: <span id="lastUpdate">--</span></div>
+      <div style="margin-top:8px"><strong>PANDEMONIUM TECH</strong> × <strong>PAN AMERICAN SILVER</strong></div>
     </div>
   </div>
   
   <script>
-    let relayState=false,simMode=false,alertActive=false,doorOpen=false;
-    let sensor1En=true,sensor2En=false,doorEn=false;
+    let alertActive=false,alertAck=false,defrostMode=false;
     
     async function fetchStatus(){
       try{
-        const res=await fetch('/api/status');
-        const d=await res.json();
+        const r=await fetch('/api/status');
+        const d=await r.json();
         const t=d.sensor.temp_avg.toFixed(1);
         const tempEl=document.getElementById('temp');
-        const sliderVal=document.getElementById('sliderValue');
         tempEl.textContent=t+'°C';
-        sliderVal.textContent=t+'°C';
-        tempEl.className='value';sliderVal.className='slider-value';
-        if(parseFloat(t)>-10){tempEl.classList.add('temp-crit');sliderVal.classList.add('temp-crit');}
-        else if(parseFloat(t)>-18){tempEl.classList.add('temp-warn');sliderVal.classList.add('temp-warn');}
-        else{tempEl.classList.add('temp-ok');sliderVal.classList.add('temp-ok');}
+        tempEl.className='temp-big';
+        if(parseFloat(t)>-10)tempEl.classList.add('temp-crit');
+        else if(parseFloat(t)>-18)tempEl.classList.add('temp-warn');
+        else tempEl.classList.add('temp-ok');
         
-        doorOpen=d.sensor.door_open;
-        document.getElementById('door').textContent=doorOpen?'🔓':'🔒';
-        document.getElementById('doorText').textContent=doorOpen?'ABIERTA':'Cerrada';
-        document.getElementById('doorText').style.color=doorOpen?'#fbbf24':'#94a3b8';
-        document.getElementById('btnDoor').textContent=doorOpen?'🚪 Puerta: ABIERTA':'🚪 Puerta: CERRADA';
-        document.getElementById('btnDoor').className=doorOpen?'btn-orange':'btn-purple';
+        document.getElementById('doorStatus').textContent='Inhabilitado';
+        document.getElementById('doorStatus').style.color='#64748b';
         
-        document.getElementById('relay').textContent=d.system.relay_on?'🔴':'⚫';
-        document.getElementById('relayText').textContent=d.system.relay_on?'ACTIVA':'Apagada';
-        document.getElementById('relayText').style.color=d.system.relay_on?'#ef4444':'#94a3b8';
-        document.getElementById('uptime').textContent=formatUptime(d.system.uptime_sec);
-        document.getElementById('tempSlider').value=t;
-        
-        simMode=d.system.simulation_mode;
-        const modeBadge=document.getElementById('modeBadge');
-        modeBadge.textContent=simMode?'SIMULACIÓN':'REAL';
-        modeBadge.className=simMode?'badge badge-sim':'badge badge-real';
-        document.getElementById('btnModoReal').className=simMode?'btn-blue':'btn-blue mode-btn-active';
-        document.getElementById('btnModoSim').className=simMode?'btn-purple mode-btn-active':'btn-purple';
-        
+        const relayOn=d.system.relay_on;
         alertActive=d.system.alert_active;
-        document.getElementById('btnAlert').textContent=alertActive?'🔕 Desactivar Alerta':'🚨 Activar Alerta';
-        document.getElementById('btnAlert').className=alertActive?'btn-green':'btn-red';
+        alertAck=d.system.alert_acknowledged||false;
+        document.getElementById('relayStatus').textContent=(alertActive&&!alertAck)?'PRENDIDA':'Apagada';
+        document.getElementById('relayStatus').style.color=(alertActive&&!alertAck)?'#ef4444':'#94a3b8';
         
-        sensor1En=d.system.sensor1_enabled;
-        sensor2En=d.system.sensor2_enabled;
-        doorEn=d.system.door_enabled;
-        document.getElementById('togSensor1').className=sensor1En?'toggle on':'toggle';
-        document.getElementById('togSensor2').className=sensor2En?'toggle on':'toggle';
-        document.getElementById('togDoor').className=doorEn?'toggle on':'toggle';
+        document.getElementById('defrostSignal').textContent=defrostMode?'ACTIVA':'Normal';
+        document.getElementById('defrostSignal').style.color=defrostMode?'#f97316':'#22c55e';
         
-        document.getElementById('deviceId').textContent=d.device.id;
-        document.getElementById('deviceIp').textContent=d.device.ip;
-        document.getElementById('deviceMdns').textContent=d.device.mdns;
-        document.getElementById('wifiRssi').textContent=d.system.wifi_rssi;
+        document.getElementById('uptime').textContent=formatUptime(d.system.uptime_sec);
+        document.getElementById('wifiRssi').textContent=d.system.wifi_rssi+' dBm';
         document.getElementById('internetStatus').textContent=d.system.internet?'✓ Online':'✗ Offline';
         document.getElementById('internetStatus').style.color=d.system.internet?'#22c55e':'#ef4444';
+        document.getElementById('deviceIp').textContent=d.device.ip;
         document.getElementById('lastUpdate').textContent=new Date().toLocaleTimeString();
         
-        // Android connections
-        document.getElementById('androidCount').textContent=d.system.android_connections||0;
-        const lastPing=d.system.last_android_ping;
-        document.getElementById('lastPing').textContent=lastPing>=0?formatUptime(lastPing)+' atrás':'Sin conexiones';
-        
         const banner=document.getElementById('alertBanner');
-        if(alertActive){banner.classList.add('active');document.getElementById('alertMsg').textContent=d.system.alert_message||'Alerta activa';}
-        else{banner.classList.remove('active');}
-        relayState=d.system.relay_on;
+        if(alertActive){
+          banner.classList.add('active');
+          banner.classList.toggle('silenced',alertAck);
+          document.getElementById('alertMsg').textContent=alertAck?'🔕 SILENCIADA - '+d.system.alert_message:d.system.alert_message;
+        }else{
+          banner.classList.remove('active');
+        }
+        
+        defrostMode=d.system.defrost_mode||false;
+        document.getElementById('defrostStatus').style.display=defrostMode?'block':'none';
+        document.getElementById('defrostTime').textContent=d.system.defrost_minutes||0;
+        document.getElementById('btnDefrost').textContent=defrostMode?'✅ DESACTIVAR':'🧊 ACTIVAR DESCONGELAMIENTO';
+        document.getElementById('btnDefrost').className=defrostMode?'btn-green':'btn-orange';
       }catch(e){console.error(e);}
-    }
-    
-    function formatUptime(s){
-      const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);
-      if(h>0)return h+'h '+m+'m';
-      if(m>0)return m+'m '+(s%60)+'s';
-      return s+'s';
-    }
-    
-    async function setMode(sim){
-      await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({simulation_mode:sim})});
-      fetchStatus();
-    }
-    
-    document.getElementById('tempSlider').addEventListener('input',async(e)=>{
-      document.getElementById('sliderValue').textContent=e.target.value+'°C';
-      await fetch('/api/simulation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,temp1:parseFloat(e.target.value),temp2:parseFloat(e.target.value)})});
-    });
-    
-    async function setTemp(t){
-      document.getElementById('tempSlider').value=t;
-      document.getElementById('sliderValue').textContent=t+'°C';
-      await fetch('/api/simulation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,temp1:t,temp2:t})});
-    }
-    
-    async function toggleDoor(){
-      document.getElementById('btnDoor').textContent='⏳ Cambiando...';
-      await fetch('/api/door/toggle',{method:'POST'});
-      await fetchStatus();
-    }
-    
-    async function toggleAlert(){
-      document.getElementById('btnAlert').textContent='⏳ Procesando...';
-      if(alertActive){await fetch('/api/alert/ack',{method:'POST'});}
-      else{await fetch('/api/alert/test',{method:'POST'});}
-      await fetchStatus();
-    }
-    
-    async function stopAlert(){
-      document.getElementById('alertBanner').style.opacity='0.5';
-      await fetch('/api/alert/ack',{method:'POST'});
-      alertActive=false;
-      document.getElementById('alertBanner').classList.remove('active');
-      document.getElementById('btnAlert').textContent='🚨 Activar Alerta';
-      document.getElementById('btnAlert').className='btn-red';
-      await fetchStatus();
-    }
-    
-    async function toggleRelay(){await fetch('/api/relay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:!relayState})});await fetchStatus();}
-    
-    async function toggleSensor(which){
-      let body={};
-      if(which==='sensor1'){body.sensor1_enabled=!sensor1En;document.getElementById('togSensor1').className=!sensor1En?'toggle on':'toggle';}
-      if(which==='sensor2'){body.sensor2_enabled=!sensor2En;document.getElementById('togSensor2').className=!sensor2En?'toggle on':'toggle';}
-      if(which==='door'){body.door_enabled=!doorEn;document.getElementById('togDoor').className=!doorEn?'toggle on':'toggle';}
-      await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      await fetchStatus();
-    }
-    
-    async function saveThresholds(){
-      const tempMax=parseFloat(document.getElementById('inTempMax').value);
-      const doorMax=parseInt(document.getElementById('inDoorMax').value);
-      const alertDelay=parseInt(document.getElementById('inAlertDelay').value);
-      await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({temp_max:tempMax,door_open_max_sec:doorMax,alert_delay_sec:alertDelay})});
-      alert('✅ Umbrales guardados!\n\nTemp máx: '+tempMax+'°C\nPuerta máx: '+doorMax+' seg\nDelay alerta: '+alertDelay+' seg');
     }
     
     async function loadConfig(){
       try{
         const r=await fetch('/api/config');
         const c=await r.json();
-        document.getElementById('inTempMax').value=c.temp_max;
-        document.getElementById('inDoorMax').value=c.door_open_max_sec;
-        document.getElementById('inAlertDelay').value=c.alert_delay_sec;
+        document.getElementById('inTempCrit').value=c.temp_critical;
+        document.getElementById('inAlertDelay').value=Math.round(c.alert_delay_sec/60);
+        document.getElementById('inDefrostCooldown').value=Math.round((c.defrost_cooldown_sec||1800)/60);
+        document.getElementById('cfgTempCrit').textContent=c.temp_critical+'°C';
+        document.getElementById('cfgAlertDelay').textContent=Math.round(c.alert_delay_sec/60)+' min';
+        document.getElementById('cfgDefrostCooldown').textContent=Math.round((c.defrost_cooldown_sec||1800)/60)+' min';
+        document.getElementById('cfgDefrostRelay').textContent=c.defrost_relay_nc?'Normal Cerrado (NC)':'Normal Abierto (NO)';
       }catch(e){}
     }
     
-    async function testTelegram(){
-      const r=await fetch('/api/telegram/test',{method:'POST'});
-      alert(r.ok?'✅ Mensaje enviado a Telegram':'❌ Error: Sin internet');
+    async function saveConfig(){
+      const tc=parseFloat(document.getElementById('inTempCrit').value);
+      const ad=parseInt(document.getElementById('inAlertDelay').value)*60;
+      const dc=parseInt(document.getElementById('inDefrostCooldown').value)*60;
+      await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({temp_critical:tc,alert_delay_sec:ad,defrost_cooldown_sec:dc})});
+      alert('✅ Configuración guardada');
+      loadConfig();
     }
-    async function resetWifi(){
-      if(confirm('¿Resetear configuración WiFi? El dispositivo se reiniciará en modo AP.')){
-        await fetch('/api/wifi/reset',{method:'POST'});
+    
+    function formatUptime(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);if(h>0)return h+'h '+m+'m';if(m>0)return m+'m '+(s%60)+'s';return s+'s';}
+    
+    async function stopAlert(){await fetch('/api/alert/ack',{method:'POST'});fetchStatus();}
+    async function testTelegram(){const r=await fetch('/api/telegram/test',{method:'POST'});alert(r.ok?'✅ Mensaje enviado':'❌ Error');}
+    async function resetWifi(){if(confirm('¿Resetear WiFi?'))await fetch('/api/wifi/reset',{method:'POST'});}
+    async function toggleDefrost(){
+      if(confirm(defrostMode?'¿Desactivar descongelamiento?':'¿Activar descongelamiento?\n\nLas alertas se deshabilitarán.')){
+        await fetch('/api/defrost',{method:'POST'});
+        fetchStatus();
       }
     }
     
-    setInterval(fetchStatus,1000);
+    setInterval(fetchStatus,2000);
     fetchStatus();
     loadConfig();
   </script>

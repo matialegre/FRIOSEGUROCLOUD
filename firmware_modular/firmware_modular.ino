@@ -231,6 +231,8 @@ void printStatusJSON() {
   system["relay_on"] = state.relayState;
   system["defrost_mode"] = state.defrostMode;
   system["defrost_minutes"] = state.defrostMode ? (millis() - state.defrostStartTime) / 60000 : 0;
+  system["cooldown_mode"] = state.cooldownMode;
+  system["cooldown_remaining_sec"] = state.cooldownRemainingSec;
   system["simulation_mode"] = config.simulationMode;
   system["uptime_sec"] = (millis() - state.uptime) / 1000;
   system["total_alerts"] = state.totalAlerts;
@@ -290,6 +292,25 @@ void loop() {
   if (millis() - lastDefrostCheck >= 500) {
     lastDefrostCheck = millis();
     checkDefrostSignal();
+  }
+  
+  // Actualizar timer de cooldown (cada segundo)
+  static unsigned long lastCooldownUpdate = 0;
+  if (millis() - lastCooldownUpdate >= 1000) {
+    lastCooldownUpdate = millis();
+    if (state.cooldownMode) {
+      unsigned long elapsed = (millis() - state.cooldownStartTime) / 1000;
+      int remaining = config.defrostCooldownSec - elapsed;
+      if (remaining <= 0) {
+        // Cooldown terminado - reactivar monitoreo normal
+        state.cooldownMode = false;
+        state.cooldownRemainingSec = 0;
+        state.cooldownStartTime = 0;
+        Serial.println("[COOLDOWN] ✓ FINALIZADO - Sistema vuelve a monitoreo normal");
+      } else {
+        state.cooldownRemainingSec = remaining;
+      }
+    }
   }
   
   // Verificar alertas cada segundo

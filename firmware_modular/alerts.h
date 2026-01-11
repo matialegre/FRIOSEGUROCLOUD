@@ -86,12 +86,25 @@ void acknowledgeAlert() {
 void checkAlerts() {
   if (!sensorData.valid) return;
   
+  // Suspender alertas durante descongelamiento
   if (state.defrostMode) {
     static unsigned long lastDefrostLog = 0;
     if (millis() - lastDefrostLog > 30000) {
       unsigned long defrostMin = (millis() - state.defrostStartTime) / 60000;
-      Serial.printf("[DESCONGELAMIENTO] Activo hace %lu min\n", defrostMin);
+      Serial.printf("[DESCONGELAMIENTO] Activo hace %lu min - Alertas suspendidas\n", defrostMin);
       lastDefrostLog = millis();
+    }
+    return;
+  }
+  
+  // Suspender alertas durante cooldown post-descongelamiento
+  if (state.cooldownMode) {
+    static unsigned long lastCooldownLog = 0;
+    if (millis() - lastCooldownLog > 30000) {
+      int minRemaining = state.cooldownRemainingSec / 60;
+      int secRemaining = state.cooldownRemainingSec % 60;
+      Serial.printf("[COOLDOWN] Esperando %d:%02d min - Alertas suspendidas\n", minRemaining, secRemaining);
+      lastCooldownLog = millis();
     }
     return;
   }

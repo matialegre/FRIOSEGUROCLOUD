@@ -17,7 +17,7 @@
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="FrioSeguro"
+        android:text="REEFER Monitor"
         android:textColor="#60a5fa"
         android:textSize="32sp"
         android:textStyle="bold"

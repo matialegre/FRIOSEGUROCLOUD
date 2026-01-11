@@ -3085,13 +3085,10 @@ id blocking
 id bottom
 id bounce
 id btnAutoConnect
-id btnChangeMode
 id btnConfig
 id btnConfigTelegram
 id btnConfigWhatsApp
 id btnConnect
-id btnConnectManual
-id btnDefrost
 id btnLogout
 id btnModeInternet
 id btnModeLocal
@@ -3124,12 +3121,10 @@ id clockwise
 id collapseActionView
 id compress
 id confirm_button
-id connectionCard
 id container
 id content
 id contentPanel
 id contiguous
-id controlButtons
 id coordinator
 id cos
 id counterclockwise
@@ -3175,7 +3170,7 @@ id endToStart
 id enterAlways
 id enterAlwaysCollapsed
 id etAlertDelay
-id etManualIp
+id etDefrostCooldown
 id etServerIp
 id etTelegramChatId
 id etTempCritical
@@ -3239,7 +3234,6 @@ id linear
 id listMode
 id list_item
 id m3_side_sheet
-id manualIpContainer
 id marquee
 id masked
 id match_parent
@@ -3416,11 +3410,7 @@ id stop
 id stretch
 id submenuarrow
 id submit_area
-id switchDoorSensor
-id switchSensor1
-id switchSensor2
-id switchSensor3
-id switchSimulation
+id switchDefrostNC
 id tabMode
 id tag_accessibility_actions
 id tag_accessibility_clickable_spans
@@ -3468,7 +3458,14 @@ id transition_scene_layoutid_cache
 id transition_transform
 id triangle
 id tvAlertMessage
+id tvConfigAlertDelay
+id tvConfigDefrostCooldown
+id tvConfigDefrostRelay
+id tvConfigTempCritical
 id tvConnectionStatus
+id tvDefrostModeStatus
+id tvDefrostSignal
+id tvDeviceIp
 id tvDoorIcon
 id tvDoorStatus
 id tvInternet
@@ -3484,8 +3481,6 @@ id tvRiftId
 id tvRiftName
 id tvRiftStatus
 id tvRiftTemp
-id tvShowManualIp
-id tvStatus
 id tvSubtitle
 id tvTemp1
 id tvTemp2
@@ -3627,7 +3622,6 @@ layout abc_tooltip
 layout activity_alert
 layout activity_login
 layout activity_main
-layout activity_mode_select
 layout activity_splash
 layout custom_dialog
 layout design_bottom_navigation_item
@@ -3646,7 +3640,6 @@ layout design_navigation_menu_item
 layout design_text_input_end_icon
 layout design_text_input_start_icon
 layout dialog_config
-layout dialog_sensor_config
 layout dialog_telegram
 layout ime_base_split_test_activity
 layout ime_secondary_split_test_activity

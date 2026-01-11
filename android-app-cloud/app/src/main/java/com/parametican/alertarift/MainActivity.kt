@@ -266,10 +266,24 @@ class MainActivity : AppCompatActivity() {
             tvConnectionStatus.setTextColor(Color.parseColor("#F44336"))
         }
         
-        // Temperatura
+        // Temperatura o Estado de Descongelamiento
         val temp = device.tempAvg ?: -999f
-        if (temp > -55 && temp < 125) {
+        
+        if (device.defrostMode) {
+            // Modo descongelamiento activo
+            tvTemperature.text = "🧊 DESCONGELANDO"
+            tvTemperature.setTextColor(Color.parseColor("#2196F3"))
+            tvTemperature.textSize = 24f
+        } else if (device.cooldownMode && device.cooldownRemainingSec > 0) {
+            // Modo cooldown - mostrar tiempo restante
+            val minR = device.cooldownRemainingSec / 60
+            val secR = device.cooldownRemainingSec % 60
+            tvTemperature.text = String.format("⏳ %d:%02d", minR, secR)
+            tvTemperature.setTextColor(Color.parseColor("#FF9800"))
+            tvTemperature.textSize = 32f
+        } else if (temp > -55 && temp < 125) {
             tvTemperature.text = String.format("%.1f°C", temp)
+            tvTemperature.textSize = 48f
             
             // Color según temperatura
             val color = when {
@@ -281,6 +295,7 @@ class MainActivity : AppCompatActivity() {
             tvTemperature.setTextColor(Color.parseColor(color))
         } else {
             tvTemperature.text = "--.-°C"
+            tvTemperature.textSize = 48f
         }
         
         // Temperaturas individuales
@@ -323,9 +338,23 @@ class MainActivity : AppCompatActivity() {
         // Device ID
         tvDeviceIp.text = "🆔 ${device.deviceId}"
         
-        // Defrost
-        tvDefrostSignal.text = if (device.defrostMode) "🧊 DESCONGELANDO" else "🧊 Normal"
-        tvDefrostSignal.setTextColor(if (device.defrostMode) Color.parseColor("#2196F3") else Color.parseColor("#888888"))
+        // Defrost / Cooldown
+        when {
+            device.defrostMode -> {
+                tvDefrostSignal.text = "🧊 DESCONGELANDO"
+                tvDefrostSignal.setTextColor(Color.parseColor("#2196F3"))
+            }
+            device.cooldownMode && device.cooldownRemainingSec > 0 -> {
+                val minR = device.cooldownRemainingSec / 60
+                val secR = device.cooldownRemainingSec % 60
+                tvDefrostSignal.text = "⏳ Cooldown ${minR}:${String.format("%02d", secR)}"
+                tvDefrostSignal.setTextColor(Color.parseColor("#FF9800"))
+            }
+            else -> {
+                tvDefrostSignal.text = "🧊 Normal"
+                tvDefrostSignal.setTextColor(Color.parseColor("#888888"))
+            }
+        }
         
         // Simulación
         simBadge.visibility = if (device.simulationMode) View.VISIBLE else View.GONE

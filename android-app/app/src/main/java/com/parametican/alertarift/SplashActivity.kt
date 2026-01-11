@@ -35,11 +35,11 @@ class SplashActivity : AppCompatActivity() {
             subtitle.startAnimation(fadeIn)
         }, 1000)
 
-        // Ir a selector de modo después de 2 segundos
+        // Ir a login después de 2.5 segundos
         Handler(Looper.getMainLooper()).postDelayed({
-            startActivity(Intent(this, ModeSelectActivity::class.java))
+            startActivity(Intent(this, LoginActivity::class.java))
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
             finish()
-        }, 2000)
+        }, 2500)
     }
 }

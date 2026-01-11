@@ -37,6 +37,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvWifiSignal: TextView
     private lateinit var tvInternet: TextView
     private lateinit var tvAlertMessage: TextView
+    private lateinit var tvDeviceIp: TextView
+    private lateinit var tvConfigTempCritical: TextView
+    private lateinit var tvConfigAlertDelay: TextView
+    private lateinit var tvConfigDefrostCooldown: TextView
+    private lateinit var tvConfigDefrostRelay: TextView
+    private lateinit var tvDefrostSignal: TextView
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
     private lateinit var btnConfig: Button
@@ -45,23 +51,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var alertBanner: LinearLayout
     private lateinit var simBadge: LinearLayout
     private lateinit var reefersContainer: LinearLayout
-    private lateinit var connectionCard: LinearLayout
-    private lateinit var controlButtons: LinearLayout
 
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
     
-    // Reefers data
-    data class ReeferInfo(
-        val id: String, 
-        val name: String, 
-        var online: Boolean, 
-        var temp: Float, 
-        var alertActive: Boolean,
-        var doorOpen: Boolean = false,
-        var sirenOn: Boolean = false
+    // 6 Reefers data
+    data class ReeferInfo(val id: String, val name: String, var online: Boolean, var temp: Float, var alertActive: Boolean)
+    private val reefers = mutableListOf(
+        ReeferInfo("REEFER-01", "Reefer Principal", true, -22.5f, false),
+        ReeferInfo("REEFER-02", "Reefer Carnes", false, -20.0f, false),
+        ReeferInfo("REEFER-03", "Reefer Lácteos", false, -18.5f, false),
+        ReeferInfo("REEFER-04", "Reefer Verduras", false, -15.0f, false),
+        ReeferInfo("REEFER-05", "Reefer Bebidas", false, -5.0f, false),
+        ReeferInfo("REEFER-06", "Reefer Backup", false, -25.0f, false)
     )
-    private val reefers = mutableListOf<ReeferInfo>()
 
     private val dataReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -72,13 +75,25 @@ class MainActivity : AppCompatActivity() {
                 val doorOpen = it.getBooleanExtra("door_open", false)
                 val relayOn = it.getBooleanExtra("relay_on", false)
                 val alertActive = it.getBooleanExtra("alert_active", false)
+                val alertAcknowledged = it.getBooleanExtra("alert_acknowledged", false)
                 val alertMsg = it.getStringExtra("alert_message") ?: ""
                 val uptime = it.getIntExtra("uptime", 0)
                 val rssi = it.getIntExtra("rssi", 0)
                 val internet = it.getBooleanExtra("internet", false)
                 val location = it.getStringExtra("location") ?: ""
+                val deviceIp = it.getStringExtra("device_ip") ?: ""
+                val defrostMode = it.getBooleanExtra("defrost_mode", false)
+                val cooldownMode = it.getBooleanExtra("cooldown_mode", false)
+                val cooldownRemainingSec = it.getIntExtra("cooldown_remaining_sec", 0)
 
-                updateDisplay(temp, temp1, temp2, doorOpen, relayOn, alertActive, alertMsg, uptime, rssi, internet, location)
+                updateDisplay(temp, temp1, temp2, doorOpen, relayOn, alertActive, alertAcknowledged, alertMsg, uptime, rssi, internet, location, deviceIp, defrostMode, cooldownMode, cooldownRemainingSec)
+                
+                // Actualizar temperatura del Reefer Principal con la real
+                if (temp > -55 && temp < 125) {
+                    reefers[0].temp = temp
+                    reefers[0].alertActive = alertActive
+                    populateReefers()
+                }
             }
         }
     }
@@ -92,8 +107,56 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermission()
         setupButtons()
 
-        if (MonitorService.isRunning) {
-            updateUIState(true)
+        // Auto-iniciar monitoreo
+        autoStartMonitoring()
+    }
+    
+    private fun autoStartMonitoring() {
+        val prefs = getSharedPreferences("parametican", MODE_PRIVATE)
+        val ip = prefs.getString("server_ip", "reefer.local") ?: "reefer.local"
+        
+        val intent = Intent(this, MonitorService::class.java)
+        intent.putExtra("server_ip", ip)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+
+        updateUIState(true)
+        
+        // Cargar valores configurados
+        loadConfigValues(ip)
+    }
+    
+    private fun loadConfigValues(ip: String) {
+        thread {
+            try {
+                val url = URL("http://$ip/api/config")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 5000
+                val response = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+
+                val json = org.json.JSONObject(response)
+                runOnUiThread {
+                    val tempCritical = json.optDouble("temp_critical", -10.0)
+                    val alertDelaySec = json.optInt("alert_delay_sec", 300)
+                    val defrostCooldownSec = json.optInt("defrost_cooldown_sec", 1800)
+                    val defrostNC = json.optBoolean("defrost_relay_nc", false)
+                    
+                    tvConfigTempCritical.text = "🌡️ Temp. Crítica: ${tempCritical}°C"
+                    tvConfigAlertDelay.text = "⏱️ Tiempo espera: ${alertDelaySec / 60} min"
+                    tvConfigDefrostCooldown.text = "🧊 Post-descongelación: ${defrostCooldownSec / 60} min"
+                    tvConfigDefrostRelay.text = if (defrostNC) 
+                        "🔌 Relé descong.: Normal Cerrado (NC)" 
+                    else 
+                        "🔌 Relé descong.: Normal Abierto (NO)"
+                }
+            } catch (e: Exception) {
+                // Silenciar error, se cargará cuando haya conexión
+            }
         }
     }
 
@@ -111,6 +174,12 @@ class MainActivity : AppCompatActivity() {
         tvWifiSignal = findViewById(R.id.tvWifiSignal)
         tvInternet = findViewById(R.id.tvInternet)
         tvAlertMessage = findViewById(R.id.tvAlertMessage)
+        tvDeviceIp = findViewById(R.id.tvDeviceIp)
+        tvConfigTempCritical = findViewById(R.id.tvConfigTempCritical)
+        tvConfigAlertDelay = findViewById(R.id.tvConfigAlertDelay)
+        tvConfigDefrostCooldown = findViewById(R.id.tvConfigDefrostCooldown)
+        tvConfigDefrostRelay = findViewById(R.id.tvConfigDefrostRelay)
+        tvDefrostSignal = findViewById(R.id.tvDefrostSignal)
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
         btnConfig = findViewById(R.id.btnConfig)
@@ -122,326 +191,11 @@ class MainActivity : AppCompatActivity() {
         // Populate Reefers list
         populateReefers()
         alertBanner = findViewById(R.id.alertBanner)
-        connectionCard = findViewById(R.id.connectionCard)
-        controlButtons = findViewById(R.id.controlButtons)
-        
-        // Ocultar conexión local si está en modo Internet
-        setupConnectionMode()
-    }
-    
-    private fun setupConnectionMode() {
-        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-        val mode = prefs.getString("connection_mode", "local")
-        
-        // SIEMPRE ocultar campo IP y botones - conexión automática
-        connectionCard.visibility = View.GONE
-        controlButtons.visibility = View.GONE
-        
-        if (mode == "internet") {
-            // Modo Internet: conectar a Supabase
-            startInternetMonitoring()
-        } else {
-            // Modo Local: conectar automáticamente al ESP32 via NSD
-            startLocalMonitoring()
-        }
-    }
-    
-    private fun startLocalMonitoring() {
-        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-        val savedIp = prefs.getString("server_ip", null)
-        
-        tvConnectionStatus.text = "📡 Conectando..."
-        tvConnectionStatus.setTextColor(Color.parseColor("#f59e0b"))
-        
-        if (savedIp != null) {
-            // Usar IP guardada del ModeSelectActivity
-            connectToLocalDevice(savedIp)
-        } else {
-            // Buscar con NSD
-            discoverLocalDevice()
-        }
-    }
-    
-    private fun connectToLocalDevice(ip: String) {
-        thread {
-            try {
-                val url = URL("http://$ip/api/status")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 5000
-                conn.readTimeout = 5000
-                val code = conn.responseCode
-                
-                if (code == 200) {
-                    val response = conn.inputStream.bufferedReader().readText()
-                    conn.disconnect()
-                    
-                    runOnUiThread {
-                        tvConnectionStatus.text = "🟢 Conectado a $ip"
-                        tvConnectionStatus.setTextColor(Color.parseColor("#22c55e"))
-                        parseLocalResponse(response)
-                    }
-                    
-                    // Iniciar polling cada 3 segundos
-                    startLocalPolling(ip)
-                } else {
-                    conn.disconnect()
-                    runOnUiThread {
-                        tvConnectionStatus.text = "⚠️ ESP32 no responde"
-                        tvConnectionStatus.setTextColor(Color.parseColor("#ef4444"))
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    tvConnectionStatus.text = "❌ Error: ${e.message}"
-                    tvConnectionStatus.setTextColor(Color.parseColor("#ef4444"))
-                }
-            }
-        }
-    }
-    
-    private fun startLocalPolling(ip: String) {
-        updateRunnable = object : Runnable {
-            override fun run() {
-                fetchFromLocal(ip)
-                handler.postDelayed(this, 3000)
-            }
-        }
-        handler.post(updateRunnable!!)
-    }
-    
-    private fun fetchFromLocal(ip: String) {
-        thread {
-            try {
-                // Hacer ping para registrar conexión Android
-                try {
-                    val pingUrl = URL("http://$ip/api/ping")
-                    val pingConn = pingUrl.openConnection() as HttpURLConnection
-                    pingConn.connectTimeout = 1000
-                    pingConn.requestMethod = "POST"
-                    pingConn.responseCode // trigger request
-                    pingConn.disconnect()
-                } catch (e: Exception) { }
-                
-                // Obtener status
-                val url = URL("http://$ip/api/status")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 3000
-                conn.readTimeout = 3000
-                
-                if (conn.responseCode == 200) {
-                    val response = conn.inputStream.bufferedReader().readText()
-                    runOnUiThread {
-                        parseLocalResponse(response)
-                        tvLastUpdate.text = "Última actualización: ${java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date())}"
-                    }
-                }
-                conn.disconnect()
-            } catch (e: Exception) {
-                // Silently fail, will retry
-            }
-        }
-    }
-    
-    private fun parseLocalResponse(json: String) {
-        try {
-            val obj = org.json.JSONObject(json)
-            
-            // El ESP32 devuelve: { sensor: {...}, system: {...}, device: {...}, location: {...} }
-            val sensor = obj.optJSONObject("sensor")
-            val system = obj.optJSONObject("system")
-            val location = obj.optJSONObject("location")
-            
-            val temp = sensor?.optDouble("temp_avg", -999.0)?.toFloat() ?: -999f
-            val temp1 = sensor?.optDouble("temp1", -999.0)?.toFloat() ?: -999f
-            val temp2 = sensor?.optDouble("temp2", -999.0)?.toFloat() ?: -999f
-            val doorOpen = sensor?.optBoolean("door_open", false) ?: false
-            val relayOn = system?.optBoolean("relay_on", false) ?: false
-            val alertActive = system?.optBoolean("alert_active", false) ?: false
-            val alertMsg = system?.optString("alert_message", "") ?: ""
-            val uptime = system?.optInt("uptime_sec", 0) ?: 0
-            val rssi = system?.optInt("wifi_rssi", 0) ?: 0
-            val internet = system?.optBoolean("internet", false) ?: false
-            val locationName = location?.optString("detail", "") ?: ""
-            val simulation = system?.optBoolean("simulation_mode", false) ?: false
-            
-            updateDisplay(temp, temp1, temp2, doorOpen, relayOn, alertActive, alertMsg, uptime, rssi, internet, locationName)
-            
-            // Mostrar badge de simulación si está activo
-            simBadge.visibility = if (simulation) View.VISIBLE else View.GONE
-        } catch (e: Exception) {
-            // Ignore parse errors
-        }
-    }
-    
-    private fun discoverLocalDevice() {
-        // Fallback: intentar IPs comunes
-        val addresses = listOf("reefer.local", "192.168.4.1", "192.168.1.100", "192.168.0.100")
-        
-        thread {
-            for (addr in addresses) {
-                try {
-                    val url = URL("http://$addr/api/status")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.connectTimeout = 2000
-                    conn.readTimeout = 2000
-                    
-                    if (conn.responseCode == 200) {
-                        conn.disconnect()
-                        
-                        // Guardar IP encontrada
-                        getSharedPreferences("frioseguro", MODE_PRIVATE).edit()
-                            .putString("server_ip", addr)
-                            .apply()
-                        
-                        runOnUiThread {
-                            connectToLocalDevice(addr)
-                        }
-                        return@thread
-                    }
-                    conn.disconnect()
-                } catch (e: Exception) { }
-            }
-            
-            runOnUiThread {
-                tvConnectionStatus.text = "❌ No se encontró ESP32"
-                tvConnectionStatus.setTextColor(Color.parseColor("#ef4444"))
-            }
-        }
-    }
-    
-    private fun startInternetMonitoring() {
-        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-        val orgSlug = prefs.getString("org_slug", "parametican") ?: "parametican"
-        
-        tvConnectionStatus.text = "🌐 Conectado a la nube"
-        tvConnectionStatus.setTextColor(Color.parseColor("#22c55e"))
-        
-        // Iniciar polling de Supabase
-        startSupabasePolling(orgSlug)
-    }
-    
-    private fun startSupabasePolling(orgSlug: String) {
-        updateRunnable = object : Runnable {
-            override fun run() {
-                fetchFromSupabase(orgSlug)
-                handler.postDelayed(this, 5000) // Cada 5 segundos
-            }
-        }
-        handler.post(updateRunnable!!)
-    }
-    
-    private fun fetchFromSupabase(orgSlug: String) {
-        thread {
-            try {
-                val supabaseUrl = ModeSelectActivity.SUPABASE_URL
-                val supabaseKey = ModeSelectActivity.SUPABASE_KEY
-                
-                // Obtener SOLO dispositivos REEFER (no CARNICERIA)
-                val devicesUrl = URL("$supabaseUrl/rest/v1/devices?device_id=like.REEFER*&select=*&order=device_id")
-                val devConn = devicesUrl.openConnection() as HttpURLConnection
-                devConn.connectTimeout = 10000
-                devConn.setRequestProperty("apikey", supabaseKey)
-                devConn.setRequestProperty("Authorization", "Bearer $supabaseKey")
-                
-                var devicesJson = "[]"
-                if (devConn.responseCode == 200) {
-                    devicesJson = devConn.inputStream.bufferedReader().readText()
-                }
-                devConn.disconnect()
-                
-                // Obtener últimas lecturas solo de REEFER
-                val readingsUrl = URL("$supabaseUrl/rest/v1/readings?device_id=like.REEFER*&select=device_id,temp_avg,temp1,temp2,door_open,siren_on,alert_active,created_at&order=created_at.desc&limit=50")
-                val readConn = readingsUrl.openConnection() as HttpURLConnection
-                readConn.connectTimeout = 10000
-                readConn.setRequestProperty("apikey", supabaseKey)
-                readConn.setRequestProperty("Authorization", "Bearer $supabaseKey")
-                
-                var readingsJson = "[]"
-                if (readConn.responseCode == 200) {
-                    readingsJson = readConn.inputStream.bufferedReader().readText()
-                }
-                readConn.disconnect()
-                
-                runOnUiThread {
-                    parseSupabaseData(devicesJson, readingsJson)
-                    tvLastUpdate.text = "Última actualización: ${java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date())}"
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    tvConnectionStatus.text = "⚠️ Error: ${e.message}"
-                    tvConnectionStatus.setTextColor(Color.parseColor("#f59e0b"))
-                }
-            }
-        }
-    }
-    
-    private fun parseSupabaseData(devicesJson: String, readingsJson: String) {
-        try {
-            val devices = org.json.JSONArray(devicesJson)
-            val readings = org.json.JSONArray(readingsJson)
-            
-            // Crear mapa de últimas lecturas por device_id
-            val latestReadings = mutableMapOf<String, org.json.JSONObject>()
-            for (i in 0 until readings.length()) {
-                val reading = readings.getJSONObject(i)
-                val deviceId = reading.optString("device_id", "")
-                if (deviceId.isNotEmpty() && !latestReadings.containsKey(deviceId)) {
-                    latestReadings[deviceId] = reading
-                }
-            }
-            
-            // Limpiar y reconstruir lista de reefers
-            reefers.clear()
-            
-            for (i in 0 until devices.length()) {
-                val device = devices.getJSONObject(i)
-                val deviceId = device.optString("device_id", "UNKNOWN")
-                val name = device.optString("name", deviceId)
-                val isOnline = device.optBoolean("is_online", false)
-                
-                // Buscar última lectura para este dispositivo
-                val reading = latestReadings[deviceId]
-                val temp = reading?.optDouble("temp_avg", -999.0)?.toFloat() ?: -999f
-                val doorOpen = reading?.optBoolean("door_open", false) ?: false
-                val sirenOn = reading?.optBoolean("siren_on", false) ?: false
-                val alertActive = reading?.optBoolean("alert_active", false) ?: false
-                
-                reefers.add(ReeferInfo(
-                    id = deviceId,
-                    name = name,
-                    online = isOnline,
-                    temp = if (temp > -900) temp else -22.5f,
-                    alertActive = alertActive,
-                    doorOpen = doorOpen,
-                    sirenOn = sirenOn
-                ))
-            }
-            
-            populateReefers()
-            
-            // Actualizar display principal con el primer dispositivo online o el primero disponible
-            val mainDevice = reefers.firstOrNull { it.online } ?: reefers.firstOrNull()
-            mainDevice?.let {
-                tvTemperature.text = String.format("%.1f°C", it.temp)
-                tvDoorStatus.text = if (it.doorOpen) "Abierta" else "Cerrada"
-                tvDoorStatus.setTextColor(Color.parseColor(if (it.doorOpen) "#ef4444" else "#22c55e"))
-                // Sirena status ya se maneja en updateDisplay
-                
-                if (it.alertActive) {
-                    tvTemperature.setTextColor(Color.parseColor("#ef4444"))
-                } else {
-                    tvTemperature.setTextColor(Color.parseColor("#22d3ee"))
-                }
-            }
-        } catch (e: Exception) {
-            // Log error pero no crashear
-            tvConnectionStatus.text = "⚠️ Error parseando datos"
-        }
     }
 
     private fun loadSavedIp() {
         val prefs = getSharedPreferences("parametican", MODE_PRIVATE)
-        etServerIp.setText(prefs.getString("server_ip", "192.168.1.100"))
+        etServerIp.setText(prefs.getString("server_ip", "reefer.local"))
     }
 
     private fun setupButtons() {
@@ -517,115 +271,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnStarlinkInfo).setOnClickListener {
             showStarlinkInfo()
         }
-        
-        // Modo Descongelamiento
-        findViewById<Button>(R.id.btnDefrost).setOnClickListener {
-            showDefrostDialog()
-        }
-        
-        // Cambiar modo conexión
-        findViewById<Button>(R.id.btnChangeMode).setOnClickListener {
-            changeConnectionMode()
-        }
-    }
-    
-    private fun showDefrostDialog() {
-        val options = arrayOf("1 hora", "2 horas", "4 horas", "8 horas", "Hasta que lo reactive")
-        val hours = arrayOf(1, 2, 4, 8, 0)
-        
-        AlertDialog.Builder(this, R.style.Theme_AlertaRift_Dialog)
-            .setTitle("🧊 Modo Descongelamiento")
-            .setMessage("Las alertas se desactivarán temporalmente.\n¿Por cuánto tiempo?")
-            .setItems(options) { _, which ->
-                val selectedHours = hours[which]
-                activateDefrostMode(selectedHours)
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-    
-    private fun activateDefrostMode(hours: Int) {
-        val ip = etServerIp.text.toString().trim()
-        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-        val mode = prefs.getString("connection_mode", "local")
-        
-        thread {
-            try {
-                if (mode == "internet") {
-                    // Enviar a Supabase
-                    val supabaseUrl = prefs.getString("supabase_url", ModeSelectActivity.SUPABASE_URL)
-                    val supabaseKey = prefs.getString("supabase_key", ModeSelectActivity.SUPABASE_KEY)
-                    val deviceId = "REEFER-01"
-                    
-                    val url = URL("$supabaseUrl/rest/v1/devices?device_id=eq.$deviceId")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.requestMethod = "PATCH"
-                    conn.setRequestProperty("Content-Type", "application/json")
-                    conn.setRequestProperty("apikey", supabaseKey)
-                    conn.setRequestProperty("Authorization", "Bearer $supabaseKey")
-                    conn.doOutput = true
-                    
-                    val payload = if (hours == 0) {
-                        """{"alerts_disabled":true,"alerts_disabled_until":null,"alerts_disabled_reason":"Descongelamiento manual"}"""
-                    } else {
-                        """{"alerts_disabled":true,"alerts_disabled_reason":"Descongelamiento $hours horas"}"""
-                    }
-                    conn.outputStream.write(payload.toByteArray())
-                    conn.responseCode
-                    conn.disconnect()
-                } else {
-                    // Enviar al ESP32 local
-                    val url = URL("http://$ip/api/config")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.requestMethod = "POST"
-                    conn.setRequestProperty("Content-Type", "application/json")
-                    conn.doOutput = true
-                    conn.connectTimeout = 5000
-                    
-                    val payload = """{"alerts_disabled":true,"defrost_hours":$hours}"""
-                    conn.outputStream.write(payload.toByteArray())
-                    conn.responseCode
-                    conn.disconnect()
-                }
-                
-                runOnUiThread {
-                    val msg = if (hours == 0) "Alertas desactivadas hasta que las reactives" else "Alertas desactivadas por $hours horas"
-                    Toast.makeText(this, "🧊 $msg", Toast.LENGTH_LONG).show()
-                    
-                    // Cambiar botón
-                    findViewById<Button>(R.id.btnDefrost).apply {
-                        text = "✅ DESCONGELAMIENTO ACTIVO"
-                        setBackgroundColor(Color.parseColor("#16a34a"))
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "❌ Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-    
-    private fun changeConnectionMode() {
-        AlertDialog.Builder(this, R.style.Theme_AlertaRift_Dialog)
-            .setTitle("🔄 Cambiar Modo")
-            .setMessage("¿Querés cambiar el modo de conexión?\n\nEsto te llevará a la pantalla de selección.")
-            .setPositiveButton("Sí, cambiar") { _, _ ->
-                // Limpiar preferencias de modo
-                getSharedPreferences("frioseguro", MODE_PRIVATE).edit()
-                    .putBoolean("mode_selected", false)
-                    .putBoolean("logged_in", false)
-                    .apply()
-                
-                // Detener servicio
-                stopService(Intent(this, MonitorService::class.java))
-                
-                // Ir a selector de modo
-                startActivity(Intent(this, ModeSelectActivity::class.java))
-                finish()
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
     }
     
     private fun showTelegramConfigDialog() {
@@ -725,181 +370,16 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun showSettingsMenu() {
-        val options = arrayOf("📱 Probar Telegram", "🔄 Reconectar", "🚪 Cerrar sesión")
+        val options = arrayOf("📱 Probar Telegram", "🚪 Cerrar sesión")
         AlertDialog.Builder(this, R.style.Theme_AlertaRift_Dialog)
             .setTitle("⚙️ Opciones")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> testTelegram()
-                    1 -> reconnect()
-                    2 -> logout()
+                    1 -> logout()
                 }
             }
             .show()
-    }
-    
-    private fun reconnect() {
-        handler.removeCallbacksAndMessages(null)
-        updateRunnable = null
-        
-        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-        prefs.edit().remove("server_ip").apply()
-        
-        tvConnectionStatus.text = "🔄 Reconectando..."
-        tvConnectionStatus.setTextColor(Color.parseColor("#f59e0b"))
-        
-        setupConnectionMode()
-    }
-    
-    private fun showSensorConfigDialog() {
-        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-        val ip = prefs.getString("server_ip", null)
-        
-        if (ip == null) {
-            Toast.makeText(this, "❌ No hay conexión con ESP32", Toast.LENGTH_SHORT).show()
-            return
-        }
-        
-        val dialogView = layoutInflater.inflate(R.layout.dialog_sensor_config, null)
-        
-        // Cargar configuración actual del ESP32
-        thread {
-            try {
-                val url = URL("http://$ip/api/config")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 5000
-                val response = conn.inputStream.bufferedReader().readText()
-                conn.disconnect()
-                
-                val json = org.json.JSONObject(response)
-                runOnUiThread {
-                    dialogView.findViewById<Switch>(R.id.switchSensor1)?.isChecked = json.optBoolean("sensor1_enabled", true)
-                    dialogView.findViewById<Switch>(R.id.switchSensor2)?.isChecked = json.optBoolean("sensor2_enabled", false)
-                    dialogView.findViewById<Switch>(R.id.switchSensor3)?.isChecked = json.optBoolean("sensor3_enabled", false)
-                    dialogView.findViewById<Switch>(R.id.switchDoorSensor)?.isChecked = json.optBoolean("door_sensor_enabled", false)
-                    dialogView.findViewById<Switch>(R.id.switchSimulation)?.isChecked = json.optBoolean("simulation", false)
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "⚠️ No se pudo cargar config", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-        
-        AlertDialog.Builder(this, R.style.Theme_AlertaRift_Dialog)
-            .setTitle("⚙️ Configurar Sensores")
-            .setView(dialogView)
-            .setPositiveButton("Guardar") { _, _ ->
-                saveSensorConfig(dialogView, ip)
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-    
-    private fun saveSensorConfig(view: View, ip: String) {
-        val sensor1 = view.findViewById<Switch>(R.id.switchSensor1)?.isChecked ?: true
-        val sensor2 = view.findViewById<Switch>(R.id.switchSensor2)?.isChecked ?: false
-        val sensor3 = view.findViewById<Switch>(R.id.switchSensor3)?.isChecked ?: false
-        val doorSensor = view.findViewById<Switch>(R.id.switchDoorSensor)?.isChecked ?: false
-        val simulation = view.findViewById<Switch>(R.id.switchSimulation)?.isChecked ?: false
-        
-        thread {
-            try {
-                val url = URL("http://$ip/api/config")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.doOutput = true
-                conn.connectTimeout = 5000
-                
-                val payload = """{
-                    "sensor1_enabled": $sensor1,
-                    "sensor2_enabled": $sensor2,
-                    "sensor3_enabled": $sensor3,
-                    "door_sensor_enabled": $doorSensor,
-                    "simulation": $simulation
-                }"""
-                
-                conn.outputStream.write(payload.toByteArray())
-                val code = conn.responseCode
-                conn.disconnect()
-                
-                runOnUiThread {
-                    if (code == 200) {
-                        Toast.makeText(this, "✅ Configuración guardada", Toast.LENGTH_SHORT).show()
-                        simBadge.visibility = if (simulation) View.VISIBLE else View.GONE
-                    } else {
-                        Toast.makeText(this, "❌ Error al guardar", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "❌ Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-    
-    private fun showSimulationDialog() {
-        val prefs = getSharedPreferences("frioseguro", MODE_PRIVATE)
-        val ip = prefs.getString("server_ip", null)
-        
-        if (ip == null) {
-            Toast.makeText(this, "❌ No hay conexión con ESP32", Toast.LENGTH_SHORT).show()
-            return
-        }
-        
-        val options = arrayOf(
-            "🟢 Activar simulación (-22°C normal)",
-            "🟡 Simular alerta de temperatura (-5°C)",
-            "🔴 Simular temperatura crítica (0°C)",
-            "🚪 Simular puerta abierta",
-            "⏹️ Desactivar simulación"
-        )
-        
-        AlertDialog.Builder(this, R.style.Theme_AlertaRift_Dialog)
-            .setTitle("🧪 Modo Simulación")
-            .setItems(options) { _, which ->
-                val payload = when (which) {
-                    0 -> """{"simulation":true,"sim_temp":-22.0}"""
-                    1 -> """{"simulation":true,"sim_temp":-5.0}"""
-                    2 -> """{"simulation":true,"sim_temp":0.0}"""
-                    3 -> """{"simulation":true,"sim_door_open":true}"""
-                    4 -> """{"simulation":false}"""
-                    else -> return@setItems
-                }
-                sendSimulationCommand(ip, payload, which != 4)
-            }
-            .show()
-    }
-    
-    private fun sendSimulationCommand(ip: String, payload: String, enableSim: Boolean) {
-        thread {
-            try {
-                val url = URL("http://$ip/api/simulation")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.doOutput = true
-                conn.connectTimeout = 5000
-                conn.outputStream.write(payload.toByteArray())
-                val code = conn.responseCode
-                conn.disconnect()
-                
-                runOnUiThread {
-                    if (code == 200) {
-                        simBadge.visibility = if (enableSim) View.VISIBLE else View.GONE
-                        Toast.makeText(this, if (enableSim) "🧪 Simulación activada" else "⏹️ Simulación desactivada", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this, "❌ Error", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "❌ Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
     }
     
     private fun toggleSimulation() {
@@ -972,8 +452,9 @@ class MainActivity : AppCompatActivity() {
                 statusIndicator.setBackgroundResource(R.drawable.bg_status_online)
             } else {
                 statusText.text = "Offline"
-                statusText.setTextColor(Color.parseColor("#64748b"))
+                statusText.setTextColor(Color.parseColor("#ef4444"))  // Rojo para offline
                 statusIndicator.setBackgroundResource(R.drawable.bg_status_offline)
+                view.findViewById<TextView>(R.id.tvReeferTemp).text = "--.-°C"  // Sin temperatura
             }
             
             reefersContainer.addView(view)
@@ -993,37 +474,83 @@ class MainActivity : AppCompatActivity() {
     private fun updateDisplay(
         temp: Float, temp1: Float, temp2: Float,
         doorOpen: Boolean, relayOn: Boolean,
-        alertActive: Boolean, alertMsg: String,
-        uptime: Int, rssi: Int, internet: Boolean, location: String
+        alertActive: Boolean, alertAcknowledged: Boolean, alertMsg: String,
+        uptime: Int, rssi: Int, internet: Boolean, location: String, deviceIp: String, 
+        defrostMode: Boolean, cooldownMode: Boolean = false, cooldownRemainingSec: Int = 0
     ) {
-        // Temperature with color coding
-        if (temp > -900) {
+        // Temperature with color coding OR Defrost/Cooldown status
+        if (defrostMode) {
+            // Modo descongelamiento activo
+            tvTemperature.text = "🧊 DESCONGELANDO"
+            tvTemperature.setTextColor(Color.parseColor("#2196F3"))
+            tvTemperature.textSize = 24f
+        } else if (cooldownMode && cooldownRemainingSec > 0) {
+            // Modo cooldown - mostrar tiempo restante
+            val minR = cooldownRemainingSec / 60
+            val secR = cooldownRemainingSec % 60
+            tvTemperature.text = String.format("⏳ %d:%02d", minR, secR)
+            tvTemperature.setTextColor(Color.parseColor("#FF9800"))
+            tvTemperature.textSize = 32f
+        } else if (temp > -55 && temp < 125) {
             tvTemperature.text = String.format("%.1f°C", temp)
+            tvTemperature.textSize = 48f
             val tempColor = when {
                 temp > -10 -> "#ef4444"  // Critical - red
                 temp > -18 -> "#fbbf24"  // Warning - yellow
                 else -> "#22d3ee"        // OK - cyan
             }
             tvTemperature.setTextColor(Color.parseColor(tempColor))
+        } else {
+            tvTemperature.text = "--.-°C"
+            tvTemperature.textSize = 48f
+            tvTemperature.setTextColor(Color.parseColor("#64748b"))
         }
 
-        if (temp1 > -900) tvTemp1.text = String.format("%.1f°C", temp1)
-        if (temp2 > -900) tvTemp2.text = String.format("%.1f°C", temp2)
+        if (temp1 > -55 && temp1 < 125) tvTemp1.text = String.format("%.1f°C", temp1)
+        if (temp2 > -55 && temp2 < 125) tvTemp2.text = String.format("%.1f°C", temp2)
 
-        // Door status
-        tvDoorStatus.text = if (doorOpen) "ABIERTA" else "Cerrada"
-        tvDoorStatus.setTextColor(Color.parseColor(if (doorOpen) "#fbbf24" else "#22c55e"))
+        // Door status - siempre inhabilitado
+        tvDoorStatus.text = "Inhabilitado"
+        tvDoorStatus.setTextColor(Color.parseColor("#64748b"))
 
-        // Relay status
-        tvRelayStatus.text = if (relayOn) "ACTIVA" else "Apagada"
-        tvRelayStatus.setTextColor(Color.parseColor(if (relayOn) "#ef4444" else "#94a3b8"))
+        // Relay/Sirena status - prendida solo si hay alerta Y no fue silenciada
+        val sirenOn = alertActive && !alertAcknowledged
+        tvRelayStatus.text = if (sirenOn) "PRENDIDA" else "Apagada"
+        tvRelayStatus.setTextColor(Color.parseColor(if (sirenOn) "#ef4444" else "#94a3b8"))
 
-        // Alert banner
+        // Alert banner - mostrar si hay alerta (activa o silenciada)
         if (alertActive) {
             alertBanner.visibility = View.VISIBLE
-            tvAlertMessage.text = alertMsg
+            if (alertAcknowledged) {
+                tvAlertMessage.text = "🔕 SILENCIADA - $alertMsg"
+            } else {
+                tvAlertMessage.text = alertMsg
+            }
         } else {
             alertBanner.visibility = View.GONE
+        }
+
+        // Device IP
+        if (deviceIp.isNotEmpty()) {
+            tvDeviceIp.text = "IP: $deviceIp"
+        }
+
+        // Defrost / Cooldown signal status
+        when {
+            defrostMode -> {
+                tvDefrostSignal.text = "📡 DESCONGELANDO"
+                tvDefrostSignal.setTextColor(Color.parseColor("#2196F3"))
+            }
+            cooldownMode && cooldownRemainingSec > 0 -> {
+                val minR = cooldownRemainingSec / 60
+                val secR = cooldownRemainingSec % 60
+                tvDefrostSignal.text = "⏳ Cooldown ${minR}:${String.format("%02d", secR)}"
+                tvDefrostSignal.setTextColor(Color.parseColor("#FF9800"))
+            }
+            else -> {
+                tvDefrostSignal.text = "📡 Señal Descong.: Normal"
+                tvDefrostSignal.setTextColor(Color.parseColor("#22c55e"))
+            }
         }
 
         // System info
@@ -1114,9 +641,17 @@ class MainActivity : AppCompatActivity() {
 
                 val json = org.json.JSONObject(response)
                 runOnUiThread {
-                    view.findViewById<EditText>(R.id.etTempMax)?.setText(json.optDouble("temp_max", -18.0).toString())
                     view.findViewById<EditText>(R.id.etTempCritical)?.setText(json.optDouble("temp_critical", -10.0).toString())
-                    view.findViewById<EditText>(R.id.etAlertDelay)?.setText(json.optInt("alert_delay_sec", 300).toString())
+                    // Convertir segundos a minutos para mostrar
+                    val alertDelaySec = json.optInt("alert_delay_sec", 300)
+                    view.findViewById<EditText>(R.id.etAlertDelay)?.setText((alertDelaySec / 60).toString())
+                    val defrostCooldownSec = json.optInt("defrost_cooldown_sec", 1800)
+                    view.findViewById<EditText>(R.id.etDefrostCooldown)?.setText((defrostCooldownSec / 60).toString())
+                    // Switch de relé NC
+                    val defrostNC = json.optBoolean("defrost_relay_nc", false)
+                    view.findViewById<android.widget.Switch>(R.id.switchDefrostNC)?.isChecked = defrostNC
+                    view.findViewById<android.widget.TextView>(R.id.tvDefrostModeStatus)?.text = 
+                        if (defrostNC) "Configurado: Normal Cerrado (NC)" else "Configurado: Normal Abierto (NO)"
                 }
             } catch (e: Exception) {
                 runOnUiThread {
@@ -1127,9 +662,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveConfig(view: View, ip: String) {
-        val tempMax = view.findViewById<EditText>(R.id.etTempMax)?.text.toString().toDoubleOrNull() ?: -18.0
         val tempCritical = view.findViewById<EditText>(R.id.etTempCritical)?.text.toString().toDoubleOrNull() ?: -10.0
-        val alertDelay = view.findViewById<EditText>(R.id.etAlertDelay)?.text.toString().toIntOrNull() ?: 300
+        // Convertir minutos a segundos para guardar
+        val alertDelayMin = view.findViewById<EditText>(R.id.etAlertDelay)?.text.toString().toIntOrNull() ?: 5
+        val alertDelaySec = alertDelayMin * 60
+        val defrostCooldownMin = view.findViewById<EditText>(R.id.etDefrostCooldown)?.text.toString().toIntOrNull() ?: 30
+        val defrostCooldownSec = defrostCooldownMin * 60
+        val defrostNC = view.findViewById<android.widget.Switch>(R.id.switchDefrostNC)?.isChecked ?: false
 
         thread {
             try {
@@ -1140,13 +679,15 @@ class MainActivity : AppCompatActivity() {
                 conn.doOutput = true
                 conn.connectTimeout = 5000
 
-                val json = """{"temp_max":$tempMax,"temp_critical":$tempCritical,"alert_delay_sec":$alertDelay}"""
+                val json = """{"temp_critical":$tempCritical,"alert_delay_sec":$alertDelaySec,"defrost_cooldown_sec":$defrostCooldownSec,"defrost_relay_nc":$defrostNC}"""
                 conn.outputStream.write(json.toByteArray())
                 conn.responseCode
                 conn.disconnect()
 
                 runOnUiThread {
                     Toast.makeText(this, "✅ Configuración guardada", Toast.LENGTH_SHORT).show()
+                    // Recargar valores configurados en la pantalla principal
+                    loadConfigValues(ip)
                 }
             } catch (e: Exception) {
                 runOnUiThread {

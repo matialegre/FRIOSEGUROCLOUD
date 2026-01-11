@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#1a1a2e">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📱 Reefer Server Android"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#60a5fa"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔴 SERVIDOR DETENIDO"
+        android:textSize="20sp"
+        android:textColor="#ef4444"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/tvUrl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Iniciá el servidor para obtener la URL"
+        android:textSize="14sp"
+        android:textColor="#94a3b8"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="▶️ INICIAR SERVIDOR"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:backgroundTint="#22c55e"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnStop"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="⏹ DETENER SERVIDOR"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:backgroundTint="#ef4444"
+        android:enabled="false"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnOpenBrowser"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="🌐 ABRIR EN NAVEGADOR"
+        android:textSize="16sp"
+        android:backgroundTint="#3b82f6"
+        android:enabled="false" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="💡 El servidor escucha en el puerto 8080\nLos ESP32 pueden enviar datos a:\nhttp://[IP_CELULAR]:8080/api/data"
+        android:textSize="12sp"
+        android:textColor="#64748b"
+        android:layout_marginTop="32dp"
+        android:gravity="center" />
+
+</LinearLayout>

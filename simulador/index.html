@@ -340,13 +340,13 @@
             <div class="panel">
                 <h3>🎮 Control del Emisor</h3>
                 
-                <div class="reefer-selector" id="reeferSelector">
-                    <button class="active" data-reefer="1">REEFER-01</button>
-                    <button data-reefer="2">REEFER-02</button>
-                    <button data-reefer="3">REEFER-03</button>
-                    <button data-reefer="4">REEFER-04</button>
-                    <button data-reefer="5">REEFER-05</button>
-                    <button data-reefer="6">REEFER-06</button>
+                <div class="reefer-selector" id="riftSelector">
+                    <button class="active" data-rift="1">REEFER-01</button>
+                    <button data-rift="2">REEFER-02</button>
+                    <button data-rift="3">REEFER-03</button>
+                    <button data-rift="4">REEFER-04</button>
+                    <button data-rift="5">REEFER-05</button>
+                    <button data-rift="6">REEFER-06</button>
                 </div>
                 
                 <div class="status-indicator">
@@ -418,7 +418,7 @@
                     
                     <div class="alerts-container" id="alertsContainer"></div>
                     
-                    <div class="reefers-grid" id="reefersGrid"></div>
+                    <div class="rifts-grid" id="riftsGrid"></div>
                     
                     <div class="map-container">
                         <iframe 
@@ -452,22 +452,22 @@
         // Estado del sistema
         const state = {
             running: false,
-            selectedReefer: 1,
+            selectedRift: 1,
             interval: null,
             sentCount: 0,
             alertCount: 0,
-            reefers: {}
+            rifts: {}
         };
         
-        // Inicializar Reefers
-        const reeferNames = ['Deposito Principal', 'Deposito Carnes', 'Deposito Lacteos', 
+        // Inicializar RIFTs
+        const riftNames = ['Deposito Principal', 'Deposito Carnes', 'Deposito Lacteos', 
                           'Deposito Verduras', 'Deposito Bebidas', 'Deposito Reserva'];
         
         for (let i = 1; i <= 6; i++) {
-            state.reefers[i] = {
+            state.rifts[i] = {
                 id: i,
                 name: `REEFER-0${i}`,
-                location: reeferNames[i-1],
+                location: riftNames[i-1],
                 temp1: -25,
                 temp2: -24,
                 tempAvg: -24.5,
@@ -493,8 +493,8 @@
         // Inicializar UI
         document.addEventListener('DOMContentLoaded', () => {
             setupSliders();
-            setupReeferSelector();
-            renderReefers();
+            setupRiftSelector();
+            renderRifts();
             updateConfig();
         });
         
@@ -522,26 +522,26 @@
             else if (value > tempMax) el.classList.add('warning');
         }
         
-        function setupReeferSelector() {
+        function setupRiftSelector() {
             document.querySelectorAll('.reefer-selector button').forEach(btn => {
                 btn.onclick = () => {
                     document.querySelectorAll('.reefer-selector button').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    state.selectedReefer = parseInt(btn.dataset.reefer);
-                    loadReeferToControls(state.selectedReefer);
+                    state.selectedRift = parseInt(btn.dataset.rift);
+                    loadRiftToControls(state.selectedRift);
                 };
             });
         }
         
-        function loadReeferToControls(reeferId) {
-            const reefer = state.reefers[reeferId];
-            document.getElementById('temp1Slider').value = reefer.temp1;
-            document.getElementById('temp2Slider').value = reefer.temp2;
-            document.getElementById('rssiSlider').value = reefer.rssi;
-            updateTempDisplay(1, reefer.temp1);
-            updateTempDisplay(2, reefer.temp2);
-            document.getElementById('rssiValue').textContent = reefer.rssi + ' dBm';
-            setDoor(reefer.doorOpen, false);
+        function loadRiftToControls(riftId) {
+            const rift = state.rifts[riftId];
+            document.getElementById('temp1Slider').value = rift.temp1;
+            document.getElementById('temp2Slider').value = rift.temp2;
+            document.getElementById('rssiSlider').value = rift.rssi;
+            updateTempDisplay(1, rift.temp1);
+            updateTempDisplay(2, rift.temp2);
+            document.getElementById('rssiValue').textContent = rift.rssi + ' dBm';
+            setDoor(rift.doorOpen, false);
         }
         
         function setDoor(open, updateState = true) {
@@ -549,13 +549,13 @@
             document.getElementById('doorOpen').classList.toggle('active', open);
             
             if (updateState) {
-                const reefer = state.reefers[state.selectedReefer];
-                if (open && !reefer.doorOpen) {
-                    reefer.doorOpenSince = Date.now();
+                const rift = state.rifts[state.selectedRift];
+                if (open && !rift.doorOpen) {
+                    rift.doorOpenSince = Date.now();
                 } else if (!open) {
-                    reefer.doorOpenSince = 0;
+                    rift.doorOpenSince = 0;
                 }
-                reefer.doorOpen = open;
+                rift.doorOpen = open;
             }
         }
         
@@ -588,144 +588,144 @@
         }
         
         function sendData() {
-            const reeferId = state.selectedReefer;
-            const reefer = state.reefers[reeferId];
+            const riftId = state.selectedRift;
+            const rift = state.rifts[riftId];
             
             // Leer valores de los controles
-            reefer.temp1 = parseFloat(document.getElementById('temp1Slider').value);
-            reefer.temp2 = parseFloat(document.getElementById('temp2Slider').value);
-            reefer.tempAvg = (reefer.temp1 + reefer.temp2) / 2;
-            reefer.rssi = parseInt(document.getElementById('rssiSlider').value);
-            reefer.online = true;
-            reefer.lastUpdate = Date.now();
+            rift.temp1 = parseFloat(document.getElementById('temp1Slider').value);
+            rift.temp2 = parseFloat(document.getElementById('temp2Slider').value);
+            rift.tempAvg = (rift.temp1 + rift.temp2) / 2;
+            rift.rssi = parseInt(document.getElementById('rssiSlider').value);
+            rift.online = true;
+            rift.lastUpdate = Date.now();
             
             // Calcular tiempo puerta abierta
-            if (reefer.doorOpen && reefer.doorOpenSince > 0) {
-                reefer.doorOpenSince = Math.floor((Date.now() - reefer.doorOpenSince) / 1000);
+            if (rift.doorOpen && rift.doorOpenSince > 0) {
+                rift.doorOpenSince = Math.floor((Date.now() - rift.doorOpenSince) / 1000);
             }
             
             state.sentCount++;
             document.getElementById('statSent').textContent = state.sentCount;
             
-            log(`[REEFER-0${reeferId}] Temp: ${reefer.tempAvg.toFixed(1)}°C | Puerta: ${reefer.doorOpen ? 'ABIERTA' : 'Cerrada'}`, 'info');
+            log(`[REEFER-0${riftId}] Temp: ${rift.tempAvg.toFixed(1)}°C | Puerta: ${rift.doorOpen ? 'ABIERTA' : 'Cerrada'}`, 'info');
             
             // Verificar alertas
-            checkAlerts(reeferId);
+            checkAlerts(riftId);
             
             // Actualizar UI
-            renderReefers();
+            renderRifts();
         }
         
-        function checkAlerts(reeferId) {
-            const reefer = state.reefers[reeferId];
+        function checkAlerts(riftId) {
+            const rift = state.rifts[riftId];
             const tempMax = parseFloat(document.getElementById('thresholdMax').value);
             const tempCrit = parseFloat(document.getElementById('thresholdCrit').value);
             const minDuration = parseInt(document.getElementById('thresholdDelay').value);
             
             // Alerta crítica inmediata
-            if (reefer.tempAvg > tempCrit) {
-                if (!reefer.alertActive) {
-                    triggerAlert(reeferId, `🚨 CRÍTICO: Temperatura ${reefer.tempAvg.toFixed(1)}°C`);
+            if (rift.tempAvg > tempCrit) {
+                if (!rift.alertActive) {
+                    triggerAlert(riftId, `🚨 CRÍTICO: Temperatura ${rift.tempAvg.toFixed(1)}°C`);
                 }
                 return;
             }
             
             // Alerta normal con delay
-            if (reefer.tempAvg > tempMax) {
-                if (reefer.doorOpen) {
+            if (rift.tempAvg > tempMax) {
+                if (rift.doorOpen) {
                     // Puerta abierta, no alertar por temperatura
-                    log(`[REEFER-0${reeferId}] Temp alta pero puerta abierta - ignorando`, 'warning');
+                    log(`[REEFER-0${riftId}] Temp alta pero puerta abierta - ignorando`, 'warning');
                 } else {
-                    if (reefer.highTempStart === 0) {
-                        reefer.highTempStart = Date.now();
-                        log(`[REEFER-0${reeferId}] Temp alta detectada, iniciando timer`, 'warning');
+                    if (rift.highTempStart === 0) {
+                        rift.highTempStart = Date.now();
+                        log(`[REEFER-0${riftId}] Temp alta detectada, iniciando timer`, 'warning');
                     } else {
-                        const elapsed = (Date.now() - reefer.highTempStart) / 1000;
-                        if (elapsed > minDuration && !reefer.alertActive) {
-                            triggerAlert(reeferId, `⚠️ Temperatura alta sostenida: ${reefer.tempAvg.toFixed(1)}°C`);
+                        const elapsed = (Date.now() - rift.highTempStart) / 1000;
+                        if (elapsed > minDuration && !rift.alertActive) {
+                            triggerAlert(riftId, `⚠️ Temperatura alta sostenida: ${rift.tempAvg.toFixed(1)}°C`);
                         }
                     }
                 }
             } else {
                 // Temperatura normal
-                reefer.highTempStart = 0;
-                if (reefer.alertActive) {
-                    clearAlert(reeferId);
+                rift.highTempStart = 0;
+                if (rift.alertActive) {
+                    clearAlert(riftId);
                 }
             }
         }
         
-        function triggerAlert(reeferId, message) {
-            const reefer = state.reefers[reeferId];
-            reefer.alertActive = true;
-            reefer.alertMessage = message;
+        function triggerAlert(riftId, message) {
+            const rift = state.rifts[riftId];
+            rift.alertActive = true;
+            rift.alertMessage = message;
             
             state.alertCount++;
             document.getElementById('statAlerts').textContent = state.alertCount;
             
-            log(`[ALERTA] ${reefer.name}: ${message}`, 'error');
+            log(`[ALERTA] ${rift.name}: ${message}`, 'error');
             
             // Simular notificación
             if (Notification.permission === 'granted') {
-                new Notification('Alerta Parametican Silver', { body: `${reefer.name}: ${message}` });
+                new Notification('Alerta Parametican Silver', { body: `${rift.name}: ${message}` });
             }
         }
         
-        function clearAlert(reeferId) {
-            const reefer = state.reefers[reeferId];
-            reefer.alertActive = false;
-            reefer.alertMessage = '';
-            log(`[REEFER-0${reeferId}] Alerta resuelta - temperatura normalizada`, 'success');
+        function clearAlert(riftId) {
+            const rift = state.rifts[riftId];
+            rift.alertActive = false;
+            rift.alertMessage = '';
+            log(`[REEFER-0${riftId}] Alerta resuelta - temperatura normalizada`, 'success');
         }
         
-        function renderReefers() {
-            const grid = document.getElementById('reefersGrid');
+        function renderRifts() {
+            const grid = document.getElementById('riftsGrid');
             const alertsContainer = document.getElementById('alertsContainer');
             
-            let reefersHtml = '';
+            let riftsHtml = '';
             let alertsHtml = '';
             
             for (let i = 1; i <= 6; i++) {
-                const reefer = state.reefers[i];
-                const tempClass = getTempClass(reefer.tempAvg, reefer.online);
-                const cardClass = reefer.alertActive ? 'reefer-card alert' : 'reefer-card';
+                const rift = state.rifts[i];
+                const tempClass = getTempClass(rift.tempAvg, rift.online);
+                const cardClass = rift.alertActive ? 'rift-card alert' : 'rift-card';
                 
-                reefersHtml += `
+                riftsHtml += `
                     <div class="${cardClass}">
-                        <div class="reefer-header">
-                            <span class="reefer-name">${reefer.name}</span>
-                            <span class="reefer-status ${reefer.online ? 'online' : 'offline'}">
-                                ${reefer.online ? 'ONLINE' : 'OFFLINE'}
+                        <div class="rift-header">
+                            <span class="rift-name">${rift.name}</span>
+                            <span class="rift-status ${rift.online ? 'online' : 'offline'}">
+                                ${rift.online ? 'ONLINE' : 'OFFLINE'}
                             </span>
                         </div>
-                        <div class="reefer-temp ${tempClass}">
-                            ${reefer.online ? reefer.tempAvg.toFixed(1) + '°C' : '--'}
+                        <div class="rift-temp ${tempClass}">
+                            ${rift.online ? rift.tempAvg.toFixed(1) + '°C' : '--'}
                         </div>
-                        <div class="reefer-info">
-                            <span>${reefer.location}</span>
-                            <span>${reefer.online ? reefer.rssi + ' dBm' : ''}</span>
+                        <div class="rift-info">
+                            <span>${rift.location}</span>
+                            <span>${rift.online ? rift.rssi + ' dBm' : ''}</span>
                         </div>
-                        <div class="reefer-door ${reefer.doorOpen ? 'open' : 'closed'}">
-                            ${reefer.doorOpen ? '🚪 PUERTA ABIERTA' : '🔒 Puerta Cerrada'}
-                            ${reefer.doorOpen && reefer.doorOpenSince > 0 ? ` (${reefer.doorOpenSince}s)` : ''}
+                        <div class="rift-door ${rift.doorOpen ? 'open' : 'closed'}">
+                            ${rift.doorOpen ? '🚪 PUERTA ABIERTA' : '🔒 Puerta Cerrada'}
+                            ${rift.doorOpen && rift.doorOpenSince > 0 ? ` (${rift.doorOpenSince}s)` : ''}
                         </div>
                     </div>
                 `;
                 
-                if (reefer.alertActive) {
+                if (rift.alertActive) {
                     alertsHtml += `
                         <div class="alert-item">
                             <span class="alert-icon">🚨</span>
                             <div>
-                                <strong>${reefer.name}</strong> - ${reefer.location}<br>
-                                <span style="color:#aaa">${reefer.alertMessage}</span>
+                                <strong>${rift.name}</strong> - ${rift.location}<br>
+                                <span style="color:#aaa">${rift.alertMessage}</span>
                             </div>
                         </div>
                     `;
                 }
             }
             
-            grid.innerHTML = reefersHtml;
+            grid.innerHTML = riftsHtml;
             alertsContainer.innerHTML = alertsHtml;
         }
         
@@ -750,7 +750,7 @@
         }
         
         function simulateScenario(scenario) {
-            const reefer = state.reefers[state.selectedReefer];
+            const rift = state.rifts[state.selectedRift];
             
             switch (scenario) {
                 case 'normal':
@@ -767,7 +767,7 @@
                     // Simular subida gradual de temperatura
                     let temp = parseFloat(document.getElementById('temp1Slider').value);
                     const doorInterval = setInterval(() => {
-                        if (!state.reefers[state.selectedReefer].doorOpen || temp >= -10) {
+                        if (!state.rifts[state.selectedRift].doorOpen || temp >= -10) {
                             clearInterval(doorInterval);
                             return;
                         }
@@ -792,8 +792,8 @@
         }
         
         function updateConfig() {
-            document.getElementById('thresholdMax').onchange = () => renderReefers();
-            document.getElementById('thresholdCrit').onchange = () => renderReefers();
+            document.getElementById('thresholdMax').onchange = () => renderRifts();
+            document.getElementById('thresholdCrit').onchange = () => renderRifts();
         }
         
         // Solicitar permiso de notificaciones
@@ -802,9 +802,9 @@
         }
         
         // Renderizar inicial
-        renderReefers();
+        renderRifts();
         log('Simulador iniciado - Campamento Parametican Silver', 'success');
-        log('Selecciona un Reefer y presiona "Iniciar Emisor"', 'info');
+        log('Selecciona un RIFT y presiona "Iniciar Emisor"', 'info');
     </script>
 </body>
 </html>

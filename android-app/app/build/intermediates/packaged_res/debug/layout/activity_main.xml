@@ -149,63 +149,37 @@
                 android:fontFamily="sans-serif-light"
                 android:layout_marginTop="8dp" />
 
+            <!-- Sensor principal (solo 1) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:gravity="center"
                 android:layout_marginTop="16dp">
 
-                <LinearLayout
-                    android:layout_width="0dp"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
+                    android:text="Sensor DS18B20"
+                    android:textColor="#64748b"
+                    android:textSize="12sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Sensor 1"
-                        android:textColor="#64748b"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvTemp1"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="--.-°C"
-                        android:textColor="#94a3b8"
-                        android:textSize="16sp" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="30dp"
-                    android:background="#334155" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/tvTemp1"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
+                    android:text="--.-°C"
+                    android:textColor="#22d3ee"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Sensor 2"
-                        android:textColor="#64748b"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvTemp2"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="--.-°C"
-                        android:textColor="#94a3b8"
-                        android:textSize="16sp" />
-                </LinearLayout>
+                <!-- tvTemp2 oculto pero mantenido para compatibilidad -->
+                <TextView
+                    android:id="@+id/tvTemp2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:text="" />
             </LinearLayout>
         </LinearLayout>
 
@@ -291,30 +265,8 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 6 Reefers Section - PRIMERO -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📦 Todos los Reefers"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
+        <!-- Connection Card -->
         <LinearLayout
-            android:id="@+id/reefersContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginBottom="12dp">
-
-            <!-- Reefer items will be added programmatically -->
-
-        </LinearLayout>
-
-        <!-- Connection Card (solo visible en modo LOCAL) -->
-        <LinearLayout
-            android:id="@+id/connectionCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -325,41 +277,18 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⚙️ Conexión Local"
+                android:text="⚙️ Conexión"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="IP del ESP32:"
-                    android:textColor="#94a3b8"
-                    android:textSize="14sp" />
-
-                <EditText
-                    android:id="@+id/etServerIp"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="12dp"
-                    android:hint="192.168.1.100"
-                    android:text="192.168.1.100"
-                    android:inputType="text"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#475569"
-                    android:background="@drawable/bg_input"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:textSize="14sp" />
-            </LinearLayout>
+            <!-- IP oculto para compatibilidad -->
+            <EditText
+                android:id="@+id/etServerIp"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:text="reefer.local" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -384,6 +313,16 @@
                     android:layout_marginStart="8dp" />
             </LinearLayout>
 
+            <!-- IP del ESP32 -->
+            <TextView
+                android:id="@+id/tvDeviceIp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="IP: --"
+                android:textColor="#60a5fa"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+
             <TextView
                 android:id="@+id/tvLastUpdate"
                 android:layout_width="match_parent"
@@ -394,39 +333,18 @@
                 android:layout_marginTop="8dp" />
         </LinearLayout>
 
-        <!-- Control Buttons -->
-        <LinearLayout
-            android:id="@+id/controlButtons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
+        <!-- Botones ocultos para compatibilidad -->
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
-            <Button
-                android:id="@+id/btnStart"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:text="▶ INICIAR"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:backgroundTint="#22c55e" />
-
-            <Button
-                android:id="@+id/btnStop"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:text="⏹ DETENER"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:backgroundTint="#64748b"
-                android:enabled="false" />
-        </LinearLayout>
+        <Button
+            android:id="@+id/btnStop"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
         <!-- Config Button -->
         <Button
@@ -437,7 +355,91 @@
             android:textColor="#94a3b8"
             android:textSize="14sp"
             android:backgroundTint="#1e293b"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Valores Configurados Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📋 Valores Configurados"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvConfigTempCritical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🌡️ Temp. Crítica: --°C"
+                android:textColor="#ef4444"
+                android:textSize="13sp"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:id="@+id/tvConfigAlertDelay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="⏱️ Tiempo espera: -- min"
+                android:textColor="#fbbf24"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:id="@+id/tvConfigDefrostCooldown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🧊 Post-descongelación: -- min"
+                android:textColor="#22d3ee"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:id="@+id/tvConfigDefrostRelay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🔌 Relé descong.: Normal Abierto (NO)"
+                android:textColor="#f97316"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:id="@+id/tvDefrostSignal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📡 Señal Descong.: Normal"
+                android:textColor="#22c55e"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- 6 Reefers Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📦 Todos los Reefers"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
             android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/reefersContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="12dp">
+
+            <!-- Reefer items will be added programmatically -->
+
+        </LinearLayout>
 
         <!-- Notifications Section -->
         <LinearLayout
@@ -647,29 +649,6 @@
                 android:gravity="center" />
         </LinearLayout>
 
-        <!-- Modo Descongelamiento - AL FINAL -->
-        <Button
-            android:id="@+id/btnDefrost"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="🧊 MODO DESCONGELAMIENTO"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:backgroundTint="#f59e0b"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Cambiar Modo Conexión - AL FINAL -->
-        <Button
-            android:id="@+id/btnChangeMode"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="🔄 CAMBIAR MODO CONEXIÓN"
-            android:textColor="#94a3b8"
-            android:textSize="13sp"
-            android:backgroundTint="#334155"
-            android:layout_marginBottom="12dp" />
-
         <!-- System Info -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -715,6 +694,40 @@
                 android:text="Internet: --"
                 android:textColor="#475569"
                 android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Footer con logos de empresas -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PANDEMONIUM TECH"
+                android:textColor="#60a5fa"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="  ×  "
+                android:textColor="#334155"
+                android:textSize="11sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PAN AMERICAN SILVER"
+                android:textColor="#94a3b8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
     </LinearLayout>

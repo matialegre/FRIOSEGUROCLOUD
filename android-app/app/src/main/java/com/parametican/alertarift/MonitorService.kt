@@ -35,17 +35,21 @@ class MonitorService : Service() {
         }
     }
 
-    private var serverIp = "192.168.1.100"
+    private var serverIp = ""
     private var handler: Handler? = null
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var alertActive = false
+    private var consecutiveErrors = 0
+    private var lastSuccessfulPoll = 0L
 
     private val pollRunnable = object : Runnable {
         override fun run() {
             pollServer()
-            handler?.postDelayed(this, 5000) // Cada 5 segundos
+            // Ajustar intervalo según estado de conexión
+            val interval = if (consecutiveErrors > 3) 10000L else 5000L
+            handler?.postDelayed(this, interval)
         }
     }
 
@@ -59,7 +63,7 @@ class MonitorService : Service() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "FrioSeguro::MonitorWakeLock"
+            "AlertaRift::MonitorWakeLock"
         )
     }
 
@@ -148,24 +152,47 @@ class MonitorService : Service() {
     }
 
     private fun pollServer() {
+        if (serverIp.isEmpty()) {
+            updateNotification("⚠️ Sin IP configurada")
+            return
+        }
+        
         Thread {
             try {
                 val url = URL("http://$serverIp/api/status")
                 val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
+                connection.connectTimeout = 8000
+                connection.readTimeout = 8000
                 connection.requestMethod = "GET"
+                connection.setRequestProperty("Connection", "close") // Evitar conexiones persistentes problemáticas
 
-                if (connection.responseCode == 200) {
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
                     val response = connection.inputStream.bufferedReader().readText()
+                    connection.disconnect()
+                    
+                    // Conexión exitosa
+                    consecutiveErrors = 0
+                    lastSuccessfulPoll = System.currentTimeMillis()
                     processResponse(response)
                 } else {
-                    updateNotification("⚠️ Error: ${connection.responseCode}")
+                    connection.disconnect()
+                    consecutiveErrors++
+                    updateNotification("⚠️ Error: código $responseCode (intento $consecutiveErrors)")
                 }
-                connection.disconnect()
             } catch (e: Exception) {
-                Log.e(TAG, "Error polling: ${e.message}")
-                updateNotification("❌ Sin conexión a $serverIp")
+                consecutiveErrors++
+                Log.e(TAG, "Error polling ($consecutiveErrors): ${e.message}")
+                
+                val timeSinceSuccess = if (lastSuccessfulPoll > 0) {
+                    (System.currentTimeMillis() - lastSuccessfulPoll) / 1000
+                } else 0
+                
+                if (consecutiveErrors <= 3) {
+                    updateNotification("⚠️ Reconectando... (intento $consecutiveErrors)")
+                } else {
+                    updateNotification("❌ Sin conexión hace ${timeSinceSuccess}s - Reintentando...")
+                }
             }
         }.start()
     }
@@ -184,6 +211,7 @@ class MonitorService : Service() {
             val temp2 = sensor.optDouble("temp2", -999.0).toFloat()
             val doorOpen = sensor.getBoolean("door_open")
             val hasAlert = system.getBoolean("alert_active")
+            val alertAcknowledged = system.optBoolean("alert_acknowledged", false)
             val alertMessage = system.optString("alert_message", "Alerta de temperatura")
             val isCritical = system.optBoolean("critical", false)
             val relayOn = system.optBoolean("relay_on", false)
@@ -191,6 +219,10 @@ class MonitorService : Service() {
             val rssi = system.optInt("wifi_rssi", 0)
             val internet = system.optBoolean("internet", false)
             val locationName = location?.optString("detail", "") ?: ""
+            
+            // Obtener IP del dispositivo
+            val device = data.optJSONObject("device")
+            val deviceIp = device?.optString("ip", "") ?: ""
             
             lastData = "Temp: ${String.format("%.1f", temp)}°C | Puerta: ${if (doorOpen) "ABIERTA" else "Cerrada"}"
             
@@ -202,18 +234,32 @@ class MonitorService : Service() {
                 putExtra("door_open", doorOpen)
                 putExtra("relay_on", relayOn)
                 putExtra("alert_active", hasAlert)
+                putExtra("alert_acknowledged", alertAcknowledged)
                 putExtra("alert_message", alertMessage)
                 putExtra("uptime", uptime)
                 putExtra("rssi", rssi)
                 putExtra("internet", internet)
                 putExtra("location", locationName)
+                putExtra("device_ip", deviceIp)
+                putExtra("defrost_mode", system.optBoolean("defrost_mode", false))
+                putExtra("cooldown_mode", system.optBoolean("cooldown_mode", false))
+                putExtra("cooldown_remaining_sec", system.optInt("cooldown_remaining_sec", 0))
             }
             androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(this)
                 .sendBroadcast(updateIntent)
             
             if (hasAlert) {
-                if (!this.alertActive) {
+                // Solo activar sonido/vibración si NO fue silenciada (acknowledged)
+                if (!this.alertActive && !alertAcknowledged) {
                     triggerAlarm(alertMessage)
+                } else if (alertAcknowledged && this.alertActive) {
+                    // Fue silenciada - parar sonido pero mantener notificación visual
+                    stopAlarmSound()
+                    stopVibration()
+                }
+                // Actualizar notificación con estado de alerta (silenciada o no)
+                if (alertAcknowledged) {
+                    updateNotification("⚠️ ALERTA SILENCIADA - $lastData")
                 }
             } else {
                 if (this.alertActive) {
@@ -324,17 +370,28 @@ class MonitorService : Service() {
         alertActive = false
         currentAlert = false
         
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        
-        vibrator?.cancel()
+        stopAlarmSound()
+        stopVibration()
         
         val manager = getSystemService(NotificationManager::class.java)
         manager.cancel(ALERT_NOTIFICATION_ID)
         
         updateNotification("✅ Alerta resuelta")
         Log.d(TAG, "Alarma detenida")
+    }
+    
+    private fun stopAlarmSound() {
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+        } catch (e: Exception) { }
+    }
+    
+    private fun stopVibration() {
+        try {
+            vibrator?.cancel()
+        } catch (e: Exception) { }
     }
     
     // Forzar detener alarma (llamado desde UI)

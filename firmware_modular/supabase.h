@@ -91,6 +91,8 @@ bool supabaseSendReading() {
   doc["buzzer_on"] = false;  // TODO: agregar variable
   doc["alert_active"] = state.alertActive;
   doc["defrost_mode"] = state.defrostMode;
+  doc["cooldown_mode"] = state.cooldownMode;
+  doc["cooldown_remaining_sec"] = state.cooldownRemainingSec;
   doc["simulation_mode"] = config.simulationMode;
   
   // Conectividad

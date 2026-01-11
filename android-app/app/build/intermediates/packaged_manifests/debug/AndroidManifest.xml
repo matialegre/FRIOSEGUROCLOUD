@@ -32,7 +32,7 @@
         android:debuggable="true"
         android:extractNativeLibs="false"
         android:icon="@drawable/ic_launcher"
-        android:label="FrioSeguro"
+        android:label="Alerta RIFT"
         android:theme="@style/Theme.AlertaRift"
         android:usesCleartextTraffic="true" >
 
@@ -48,13 +48,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Selector de Modo LOCAL/INTERNET -->
-        <activity
-            android:name="com.parametican.alertarift.ModeSelectActivity"
-            android:exported="false"
-            android:theme="@style/Theme.AlertaRift" />
-
-        <!-- Login (legacy) -->
+        <!-- Login -->
         <activity
             android:name="com.parametican.alertarift.LoginActivity"
             android:exported="false"

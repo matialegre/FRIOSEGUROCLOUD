@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#1e293b">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- Temp Critical -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🌡️ Temperatura Crítica (°C)"
+        android:textColor="#ef4444"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Si la temperatura supera este valor, se activa la alarma"
+        android:textColor="#64748b"
+        android:textSize="12sp" />
+
+    <EditText
+        android:id="@+id/etTempCritical"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_input"
+        android:hint="-10"
+        android:inputType="numberDecimal|numberSigned"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#475569"
+        android:textSize="18sp" />
+
+    <!-- Tiempo de espera en MINUTOS -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⏱️ Tiempo de espera (minutos)"
+        android:textColor="#fbbf24"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Cuántos minutos debe mantenerse la temperatura alta antes de activar la alarma"
+        android:textColor="#64748b"
+        android:textSize="12sp" />
+
+    <EditText
+        android:id="@+id/etAlertDelay"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_input"
+        android:hint="5"
+        android:inputType="number"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#475569"
+        android:textSize="18sp" />
+
+    <!-- Tiempo máximo puerta abierta -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🚪 Tiempo máx. puerta abierta (segundos)"
+        android:textColor="#a855f7"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Tiempo máximo que la puerta puede estar abierta antes de alertar"
+        android:textColor="#64748b"
+        android:textSize="12sp" />
+
+    <EditText
+        android:id="@+id/etDoorMaxTime"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_input"
+        android:hint="120"
+        android:inputType="number"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#475569"
+        android:textSize="18sp" />
+
+    <!-- Hidden field to maintain compatibility -->
+    <EditText
+        android:id="@+id/etTempMax"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <!-- Separador -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="#334155" />
+
+    <!-- Tiempo de espera post-descongelación -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🧊 Tiempo post-descongelación (minutos)"
+        android:textColor="#22d3ee"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Tiempo de espera después de descongelación para reactivar monitoreo"
+        android:textColor="#64748b"
+        android:textSize="12sp" />
+
+    <EditText
+        android:id="@+id/etDefrostCooldown"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_input"
+        android:hint="30"
+        android:inputType="number"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#475569"
+        android:textSize="18sp" />
+
+    <!-- Separador -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="#334155" />
+
+    <!-- Relé de descongelamiento -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔌 Entrada Relé Descongelamiento"
+        android:textColor="#f97316"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Configurar si la entrada es Normal Abierto (NO) o Normal Cerrado (NC)"
+        android:textColor="#64748b"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Normal Abierto (NO)"
+            android:textColor="#94a3b8"
+            android:textSize="14sp" />
+
+        <Switch
+            android:id="@+id/switchDefrostNC"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:thumbTint="#22c55e"
+            android:trackTint="#334155" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Normal Cerrado (NC)"
+            android:textColor="#94a3b8"
+            android:textSize="14sp"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvDefrostModeStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Configurado: Normal Abierto (NO)"
+        android:textColor="#22c55e"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="💡 Ejemplo: Si pones 29°C y 5 minutos, la alarma sonará cuando la temperatura supere 29°C por más de 5 minutos."
+        android:textColor="#22d3ee"
+        android:textSize="11sp" />
+
+</LinearLayout>
+</ScrollView>

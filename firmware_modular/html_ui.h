@@ -57,9 +57,15 @@ String getEmbeddedHTML() {
       <button class="btn-green" onclick="stopAlert()">🛑 DETENER ALERTA</button>
     </div>
     
-    <div class="card">
-      <h2>🌡️ TEMPERATURA</h2>
+    <div class="card" id="mainTempCard">
+      <h2 id="mainCardTitle">🌡️ TEMPERATURA</h2>
       <div class="temp-big temp-ok" id="temp">--.-°C</div>
+      <div id="defrostBigStatus" style="display:none;text-align:center;margin-top:10px;color:#90CAF9;font-size:0.9em">
+        Alertas suspendidas durante descongelamiento
+      </div>
+      <div id="cooldownBigStatus" style="display:none;text-align:center;margin-top:10px;color:#FFB74D;font-size:0.9em">
+        Alertas suspendidas - Sistema estabilizándose
+      </div>
     </div>
     
     <div class="card">
@@ -139,8 +145,48 @@ String getEmbeddedHTML() {
         document.getElementById('relayStatus').style.color=(alertActive&&!alertAck)?'#ef4444':'#94a3b8';
         
         defrostMode=d.system.defrost_mode||false;
-        document.getElementById('defrostSignal').textContent=defrostMode?'ACTIVA':'Normal';
-        document.getElementById('defrostSignal').style.color=defrostMode?'#f97316':'#22c55e';
+        const cooldownMode=d.system.cooldown_mode||false;
+        const cooldownSec=d.system.cooldown_remaining_sec||0;
+        
+        document.getElementById('defrostSignal').textContent=defrostMode?'ACTIVA':(cooldownMode?'COOLDOWN':'Normal');
+        document.getElementById('defrostSignal').style.color=defrostMode?'#f97316':(cooldownMode?'#FF9800':'#22c55e');
+        
+        // Mostrar estado grande según modo
+        const mainCard=document.getElementById('mainTempCard');
+        const mainTitle=document.getElementById('mainCardTitle');
+        const defrostBig=document.getElementById('defrostBigStatus');
+        const cooldownBig=document.getElementById('cooldownBigStatus');
+        
+        if(defrostMode){
+          mainTitle.textContent='🧊 MODO DESCONGELAMIENTO';
+          mainTitle.style.color='#2196F3';
+          tempEl.textContent='ACTIVO';
+          tempEl.style.color='#2196F3';
+          tempEl.style.fontSize='2.5em';
+          tempEl.className='temp-big';
+          defrostBig.style.display='block';
+          cooldownBig.style.display='none';
+          mainCard.style.borderLeft='4px solid #2196F3';
+        }else if(cooldownMode && cooldownSec>0){
+          const minR=Math.floor(cooldownSec/60);
+          const secR=cooldownSec%60;
+          mainTitle.textContent='⏳ ESPERANDO POST-DESCONGELAMIENTO';
+          mainTitle.style.color='#FF9800';
+          tempEl.textContent=minR+':'+(secR<10?'0':'')+secR;
+          tempEl.style.color='#FF9800';
+          tempEl.style.fontSize='3em';
+          tempEl.className='temp-big';
+          defrostBig.style.display='none';
+          cooldownBig.style.display='block';
+          mainCard.style.borderLeft='4px solid #FF9800';
+        }else{
+          mainTitle.textContent='🌡️ TEMPERATURA';
+          mainTitle.style.color='#fff';
+          tempEl.style.fontSize='4em';
+          defrostBig.style.display='none';
+          cooldownBig.style.display='none';
+          mainCard.style.borderLeft='none';
+        }
         
         document.getElementById('supabaseStatus').textContent=d.system.supabase_enabled?'✓ Activo':'Deshabilitado';
         document.getElementById('supabaseStatus').style.color=d.system.supabase_enabled?'#22c55e':'#64748b';
