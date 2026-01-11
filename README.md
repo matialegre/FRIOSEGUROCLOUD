@@ -1,4 +1,4 @@
-# 🏔️ Sistema de Monitoreo RIFT - Campamento Parametican Silver
+# 🏔️ FrioSeguro - Sistema de Monitoreo de Reefers
 
 ## Ubicación
 **Cerro Moro, Santa Cruz, Argentina**
@@ -10,43 +10,46 @@
 
 ## 🎯 Descripción del Sistema
 
-Sistema **UNIFICADO** de monitoreo de temperatura para **RIFTs** (depósitos de comida refrigerados). Un solo ESP32 hace todo: sensores, web server, alertas locales y notificaciones.
+Sistema **COMPLETO** de monitoreo de temperatura para **Reefers** (contenedores refrigerados). Incluye firmware ESP32, apps Android (local y cloud), y dashboard web.
 
 ### Arquitectura
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      ESP32 UNIFICADO                        │
+│                    ESP32 (firmware_modular)                 │
 ├─────────────────────────────────────────────────────────────┤
-│  📡 WiFi Local (192.168.1.100)                              │
-│  🌡️ Sensores DS18B20 (temperatura)                          │
+│  📡 WiFi + mDNS                                             │
+│  🌡️ Sensores DS18B20 x2 (temperatura)                       │
 │  🚪 Reed Switch (puerta)                                    │
-│  🔔 Relay (sirena/luz 12V)                                  │
-│  💡 LEDs (estado)                                           │
-│  🔊 Buzzer (alerta sonora)                                  │
-│  🌐 Web Server (dashboard completo)                         │
-│  📱 API REST (para app Android)                             │
-│  📨 Telegram (cuando hay internet)                          │
+│  🔔 Relay (sirena 12V)                                      │
+│  🧊 Detección automática de defrost                         │
+│  🌐 Web Server + API REST                                   │
+│  ☁️ Supabase (sincronización cloud)                         │
+│  📨 Telegram (alertas)                                      │
 └─────────────────────────────────────────────────────────────┘
          │                    │                    │
          ▼                    ▼                    ▼
     ┌─────────┐         ┌─────────┐         ┌─────────┐
-    │ 📱 App  │         │ 💻 Web  │         │ 📨 Tg   │
-    │ Android │         │ Browser │         │ Bot     │
+    │ 📱 App  │         │ 📱 App  │         │ 🌐 Web  │
+    │ Local   │         │ Cloud   │         │Dashboard│
     └─────────┘         └─────────┘         └─────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+    WiFi Local           Supabase              Netlify
 ```
 
 ### Características
 
-✅ **Sistema unificado** - Un solo ESP32 hace todo  
+✅ **Firmware modular** - Código organizado en módulos  
 ✅ **Funciona 100% offline** - No necesita internet  
-✅ **App Android nativa** - Alarma aunque el celular esté bloqueado  
-✅ **Sirena/Luz 12V** - Relay para alerta física potente  
-✅ **Anti-falsos positivos** - Ignora picos por apertura de puerta  
+✅ **App Android Local** - Conexión directa al ESP32 por WiFi  
+✅ **App Android Cloud** - Monitoreo remoto via Supabase  
+✅ **Dashboard Web** - React + Vite desplegado en Netlify  
+✅ **Detección de defrost** - Ignora automáticamente descongelación  
+✅ **Anti-falsos positivos** - Espera configurable antes de alertar  
 ✅ **Telegram** - Alertas cuando hay internet disponible  
-✅ **Dashboard web** - Diseño moderno con animaciones  
-✅ **Configuración desde web/app** - Umbrales editables  
-✅ **Mapa integrado** - Ubicación del campamento  
+✅ **Supabase** - Base de datos cloud en tiempo real  
+✅ **Configuración editable** - Desde app o web  
 
 ---
 
@@ -54,22 +57,29 @@ Sistema **UNIFICADO** de monitoreo de temperatura para **RIFTs** (depósitos de 
 
 ```
 campamento-parametican/
-├── firmware/                    # Código ESP32
-│   ├── firmware.ino            # Código principal
-│   ├── config.h                # Configuración (WiFi, pines, etc)
-│   └── data/                   # Archivos para SPIFFS
-│       └── index.html          # Dashboard web
-├── android-app/                # App Android
-│   ├── app/src/main/
-│   │   ├── java/.../           # Código Kotlin
-│   │   ├── res/                # Layouts y recursos
-│   │   └── AndroidManifest.xml
-│   └── build.gradle
-├── docs/                       # Documentación
-│   ├── ALERTAS_LOCALES.md
-│   └── LISTA_MATERIALES.md
-├── .github/workflows/          # CI/CD
-│   └── build-apk.yml          # Compila APK automáticamente
+├── firmware_modular/           # Código ESP32 (USAR ESTE)
+│   ├── firmware_modular.ino   # Código principal
+│   ├── config.h               # Configuración hardware
+│   ├── types.h                # Estructuras de datos
+│   ├── storage.h              # Almacenamiento Preferences
+│   ├── sensors.h              # Lectura DS18B20, DHT22
+│   ├── alerts.h               # Lógica de alertas
+│   ├── telegram.h             # Notificaciones Telegram
+│   ├── supabase.h             # Integración Supabase
+│   ├── wifi_utils.h           # Gestión WiFi
+│   ├── web_api.h              # API REST
+│   └── html_ui.h              # Dashboard embebido
+├── android-app/               # App Android LOCAL
+│   └── app/src/main/          # Conexión directa ESP32
+├── android-app-cloud/         # App Android CLOUD
+│   └── app/src/main/          # Conexión via Supabase
+├── web-dashboard/             # Dashboard Web (React)
+│   ├── src/App.jsx            # Componente principal
+│   ├── src/supabaseClient.js  # Cliente Supabase
+│   └── netlify.toml           # Config deploy
+├── supabase/                  # Scripts SQL
+│   ├── schema_v2_clean.sql    # Schema de base de datos
+│   └── test_supabase.py       # Script de prueba
 └── README.md
 ```
 
@@ -250,3 +260,4 @@ Bot: **@FrioSeguro_bot**
 
 Proyecto desarrollado para Campamento Parametican Silver.
 Cerro Moro, Santa Cruz, Argentina.
+"# FRIOSEGUROCLOUD" 
