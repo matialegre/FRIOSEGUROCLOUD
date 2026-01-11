@@ -212,17 +212,26 @@ void handleApiDefrost() {
     state.alertActive = false;
     state.criticalAlert = false;
     state.alertAcknowledged = false;
+    // Cancelar cooldown si estaba activo
+    state.cooldownMode = false;
+    state.cooldownRemainingSec = 0;
+    state.cooldownStartTime = 0;
     setRelay(false);
     digitalWrite(PIN_BUZZER, LOW);
-    Serial.println("[DESCONGELAMIENTO] ACTIVADO");
+    Serial.println("[DESCONGELAMIENTO] ACTIVADO MANUALMENTE");
   } else {
     unsigned long defrostMin = (millis() - state.defrostStartTime) / 60000;
     state.defrostStartTime = 0;
+    // INICIAR COOLDOWN cuando se desactiva manualmente
+    state.cooldownMode = true;
+    state.cooldownStartTime = millis();
+    state.cooldownRemainingSec = config.defrostCooldownSec;
     Serial.printf("[DESCONGELAMIENTO] DESACTIVADO - Duró %lu min\n", defrostMin);
+    Serial.printf("[COOLDOWN] Iniciando espera de %d minutos\n", config.defrostCooldownSec / 60);
   }
   
   server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200, "application/json", "{\"success\":true,\"defrost_mode\":" + String(state.defrostMode ? "true" : "false") + "}");
+  server.send(200, "application/json", "{\"success\":true,\"defrost_mode\":" + String(state.defrostMode ? "true" : "false") + ",\"cooldown_mode\":" + String(state.cooldownMode ? "true" : "false") + "}");
 }
 
 // ============================================
