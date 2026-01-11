@@ -151,7 +151,7 @@ void sendAlertToSupabase(String alertType, String severity, String message) {
 }
 
 // ============================================
-// ACTUALIZAR ESTADO ONLINE
+// ACTUALIZAR ESTADO ONLINE E IP
 // ============================================
 bool supabaseUpdateDeviceStatus(bool isOnline) {
   if (!config.supabaseEnabled || !state.internetAvailable) {
@@ -167,12 +167,22 @@ bool supabaseUpdateDeviceStatus(bool isOnline) {
   http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
   http.addHeader("Prefer", "return=minimal");
   
-  String payload = "{\"is_online\":" + String(isOnline ? "true" : "false") + "}";
+  // Enviar estado online e IP
+  StaticJsonDocument<256> doc;
+  doc["is_online"] = isOnline;
+  doc["ip_address"] = state.localIP;
+  
+  String payload;
+  serializeJson(doc, payload);
   
   int code = http.PATCH(payload);
   http.end();
   
-  return (code == 200 || code == 204);
+  if (code == 200 || code == 204) {
+    Serial.printf("[SUPABASE] ✓ Estado actualizado (IP: %s)\n", state.localIP.c_str());
+    return true;
+  }
+  return false;
 }
 
 // ============================================
@@ -361,6 +371,16 @@ void supabaseSync() {
     
     if (state.internetAvailable) {
       supabaseSendReading();
+    }
+  }
+  
+  // Actualizar estado del dispositivo (online + IP) cada 60 segundos
+  static unsigned long lastDeviceUpdate = 0;
+  if (now - lastDeviceUpdate >= 60000) {
+    lastDeviceUpdate = now;
+    
+    if (state.internetAvailable) {
+      supabaseUpdateDeviceStatus(true);
     }
   }
   
