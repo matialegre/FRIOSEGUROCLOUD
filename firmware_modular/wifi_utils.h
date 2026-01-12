@@ -22,12 +22,20 @@ extern SystemState state;
 void connectWiFi() {
   Serial.println("\n[WIFI] Iniciando WiFiManager...");
   
-  wifiManager.setConfigPortalTimeout(180);
+  wifiManager.setConfigPortalTimeout(AP_TIMEOUT);
   wifiManager.setConnectTimeout(30);
   
-  String apName = String(DEVICE_NAME) + "_Setup";
+  bool connected;
+  // Si AP_PASSWORD está vacío, crear AP sin contraseña
+  if (strlen(AP_PASSWORD) == 0) {
+    Serial.printf("[WIFI] Creando AP '%s' SIN contraseña\n", AP_NAME);
+    connected = wifiManager.autoConnect(AP_NAME);
+  } else {
+    Serial.printf("[WIFI] Creando AP '%s' CON contraseña\n", AP_NAME);
+    connected = wifiManager.autoConnect(AP_NAME, AP_PASSWORD);
+  }
   
-  if (!wifiManager.autoConnect(apName.c_str(), "reefer123")) {
+  if (!connected) {
     Serial.println("[WIFI] ✗ Falló conexión - Modo AP activo");
     state.apMode = true;
     state.wifiConnected = false;

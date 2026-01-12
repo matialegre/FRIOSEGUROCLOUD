@@ -14,7 +14,7 @@
 // WIFIMANAGER - Configuración del Access Point
 // ============================================
 #define AP_NAME "Reefer-Setup"         // Nombre del AP cuando no hay WiFi
-#define AP_PASSWORD "reefer1234"       // Password del AP (mínimo 8 caracteres)
+#define AP_PASSWORD ""       // Password del AP (mínimo 8 caracteres)
 #define AP_TIMEOUT 180                 // Segundos antes de reiniciar si no se configura
 
 // ============================================

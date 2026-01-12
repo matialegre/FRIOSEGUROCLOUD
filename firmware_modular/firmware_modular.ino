@@ -103,6 +103,7 @@ void initPins() {
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_DOOR, INPUT_PULLUP);
   pinMode(PIN_DEFROST_INPUT, INPUT_PULLUP);  // Entrada para señal de defrost del reefer
+  pinMode(PIN_WIFI_RESET, INPUT_PULLUP);     // Botón BOOT para reset WiFi
   
   digitalWrite(PIN_RELAY, RELAY_OFF);
   digitalWrite(PIN_BUZZER, LOW);
@@ -110,6 +111,7 @@ void initPins() {
   Serial.println("[OK] Pines inicializados");
   Serial.printf("[OK] Pin defrost: GPIO%d (modo %s)\n", PIN_DEFROST_INPUT, 
                 config.defrostRelayNC ? "NC" : "NA");
+  Serial.printf("[OK] Pin reset WiFi: GPIO%d (mantener 3 seg)\n", PIN_WIFI_RESET);
 }
 
 // ============================================
@@ -272,6 +274,27 @@ void printStatusJSON() {
 void loop() {
   // Manejar peticiones web
   server.handleClient();
+  
+  // Verificar botón BOOT para reset WiFi (mantener 3 segundos)
+  static unsigned long bootButtonPressStart = 0;
+  if (digitalRead(PIN_WIFI_RESET) == LOW) {
+    if (bootButtonPressStart == 0) {
+      bootButtonPressStart = millis();
+      Serial.println("[BOOT] Botón presionado - mantener 3 seg para reset WiFi");
+    } else if (millis() - bootButtonPressStart >= 3000) {
+      Serial.println("[BOOT] ¡RESET WiFi activado!");
+      // Parpadear LED/buzzer para indicar
+      for (int i = 0; i < 5; i++) {
+        digitalWrite(PIN_BUZZER, HIGH);
+        delay(100);
+        digitalWrite(PIN_BUZZER, LOW);
+        delay(100);
+      }
+      resetWiFi();  // Esto reinicia el ESP32
+    }
+  } else {
+    bootButtonPressStart = 0;
+  }
   
   // Leer sensores cada 2 segundos
   static unsigned long lastSensorRead = 0;
