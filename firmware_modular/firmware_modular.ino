@@ -269,9 +269,165 @@ void printStatusJSON() {
 }
 
 // ============================================
+// COMANDOS SERIAL
+// ============================================
+void processSerialCommand() {
+  if (!Serial.available()) return;
+  
+  String cmd = Serial.readStringUntil('\n');
+  cmd.trim();
+  
+  if (cmd.length() == 0) return;
+  
+  Serial.printf("\n[CMD] Recibido: '%s'\n", cmd.c_str());
+  
+  // HELP - Mostrar comandos disponibles
+  if (cmd == "HELP" || cmd == "help" || cmd == "?") {
+    Serial.println("\n╔════════════════════════════════════════════════════════╗");
+    Serial.println("║           COMANDOS SERIAL DISPONIBLES                  ║");
+    Serial.println("╠════════════════════════════════════════════════════════╣");
+    Serial.println("║ WIFI:SSID:PASSWORD  - Configurar y conectar WiFi       ║");
+    Serial.println("║ WIFI:SSID:          - WiFi sin contraseña              ║");
+    Serial.println("║ WIFI:RESET          - Borrar WiFi y entrar en modo AP  ║");
+    Serial.println("║ WIFI:STATUS         - Ver estado actual del WiFi       ║");
+    Serial.println("║ REBOOT              - Reiniciar el ESP32               ║");
+    Serial.println("║ STATUS              - Ver estado del sistema           ║");
+    Serial.println("║ HELP                - Mostrar esta ayuda               ║");
+    Serial.println("╚════════════════════════════════════════════════════════╝\n");
+    return;
+  }
+  
+  // REBOOT - Reiniciar ESP32
+  if (cmd == "REBOOT" || cmd == "reboot" || cmd == "RESTART" || cmd == "restart") {
+    Serial.println("[CMD] Reiniciando ESP32 en 2 segundos...");
+    delay(2000);
+    ESP.restart();
+    return;
+  }
+  
+  // STATUS - Ver estado
+  if (cmd == "STATUS" || cmd == "status") {
+    Serial.println("\n===== ESTADO DEL SISTEMA =====");
+    Serial.printf("WiFi conectado: %s\n", state.wifiConnected ? "SI" : "NO");
+    Serial.printf("SSID: %s\n", WiFi.SSID().c_str());
+    Serial.printf("IP: %s\n", state.localIP.c_str());
+    Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
+    Serial.printf("Internet: %s\n", state.internetAvailable ? "SI" : "NO");
+    Serial.printf("Modo AP: %s\n", state.apMode ? "SI" : "NO");
+    Serial.printf("Temperatura: %.1f°C\n", sensorData.tempAvg);
+    Serial.printf("Alerta activa: %s\n", state.alertActive ? "SI" : "NO");
+    Serial.printf("Defrost: %s\n", state.defrostMode ? "SI" : "NO");
+    Serial.printf("Cooldown: %s (%d seg)\n", state.cooldownMode ? "SI" : "NO", state.cooldownRemainingSec);
+    Serial.println("==============================\n");
+    return;
+  }
+  
+  // WIFI:RESET - Borrar configuración WiFi
+  if (cmd == "WIFI:RESET" || cmd == "wifi:reset") {
+    Serial.println("[CMD] Borrando configuración WiFi...");
+    wifiManager.resetSettings();
+    Serial.println("[CMD] WiFi borrado. Reiniciando para entrar en modo AP...");
+    delay(1000);
+    ESP.restart();
+    return;
+  }
+  
+  // WIFI:STATUS - Ver estado WiFi
+  if (cmd == "WIFI:STATUS" || cmd == "wifi:status") {
+    Serial.println("\n===== ESTADO WIFI =====");
+    Serial.printf("Conectado: %s\n", WiFi.isConnected() ? "SI" : "NO");
+    Serial.printf("SSID: %s\n", WiFi.SSID().c_str());
+    Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+    Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
+    Serial.printf("MAC: %s\n", WiFi.macAddress().c_str());
+    Serial.println("=======================\n");
+    return;
+  }
+  
+  // WIFI:SSID:PASSWORD - Configurar WiFi
+  if (cmd.startsWith("WIFI:") || cmd.startsWith("wifi:")) {
+    // Formato: WIFI:NombreRed:Contraseña o WIFI:NombreRed: (sin contraseña)
+    int firstColon = cmd.indexOf(':');
+    int secondColon = cmd.indexOf(':', firstColon + 1);
+    
+    if (firstColon == -1 || secondColon == -1) {
+      Serial.println("[CMD] Formato incorrecto. Usar: WIFI:SSID:PASSWORD o WIFI:SSID:");
+      return;
+    }
+    
+    String ssid = cmd.substring(firstColon + 1, secondColon);
+    String password = cmd.substring(secondColon + 1);
+    
+    ssid.trim();
+    password.trim();
+    
+    if (ssid.length() == 0) {
+      Serial.println("[CMD] Error: SSID no puede estar vacío");
+      return;
+    }
+    
+    Serial.printf("[CMD] Configurando WiFi...\n");
+    Serial.printf("[CMD] SSID: '%s'\n", ssid.c_str());
+    Serial.printf("[CMD] Password: '%s' (%d caracteres)\n", 
+                  password.length() > 0 ? "****" : "(vacía)", password.length());
+    
+    // Desconectar WiFi actual
+    WiFi.disconnect(true);
+    delay(500);
+    
+    // Intentar conectar
+    Serial.println("[CMD] Conectando...");
+    
+    if (password.length() == 0) {
+      WiFi.begin(ssid.c_str());
+    } else {
+      WiFi.begin(ssid.c_str(), password.c_str());
+    }
+    
+    // Esperar conexión (máximo 15 segundos)
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+      delay(500);
+      Serial.print(".");
+      attempts++;
+    }
+    Serial.println();
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("[CMD] ✓ ¡CONECTADO!");
+      Serial.printf("[CMD] IP: %s\n", WiFi.localIP().toString().c_str());
+      state.wifiConnected = true;
+      state.apMode = false;
+      state.localIP = WiFi.localIP().toString();
+      
+      // Guardar credenciales en WiFiManager para que persistan
+      // WiFiManager las guarda automáticamente si usamos autoConnect después
+      Serial.println("[CMD] Credenciales guardadas. El ESP32 recordará esta red.");
+    } else {
+      Serial.println("[CMD] ✗ No se pudo conectar");
+      Serial.println("[CMD] Verificá SSID y contraseña");
+      Serial.println("[CMD] Entrando en modo AP para configuración manual...");
+      
+      // Reiniciar para entrar en modo AP
+      delay(2000);
+      ESP.restart();
+    }
+    return;
+  }
+  
+  // Comando no reconocido
+  Serial.printf("[CMD] Comando no reconocido: '%s'\n", cmd.c_str());
+  Serial.println("[CMD] Escribí 'HELP' para ver comandos disponibles");
+}
+
+// ============================================
 // LOOP PRINCIPAL
 // ============================================
 void loop() {
+  // Procesar comandos Serial
+  processSerialCommand();
+  
   // Manejar peticiones web
   server.handleClient();
   
