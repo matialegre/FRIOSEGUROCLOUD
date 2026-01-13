@@ -1,43 +1,52 @@
 # Carcasas 3D Recomendadas para FrioSeguro
 
-## Opción 1: Waterproof Electronic Box (RECOMENDADA)
-**Link**: https://www.thingiverse.com/thing:4921568
+## ⭐ Opción 1: Caja Parametrizable IP65/IP67 (LA MEJOR - PRINTABLES)
+**Link**: https://www.printables.com/model/72839-customizable-parametric-stable-and-waterproof-elec
 
-- Caja impermeable parametrizable con OpenSCAD
-- Podés ajustar las dimensiones exactas
-- Tiene opciones para pasamuros de cables
-- Ideal para ambiente industrial/reefer
+- **IMPERMEABLE** - Ideal para reefer/industrial
+- Totalmente parametrizable con OpenSCAD
+- Soporta hasta 3 PCBs diferentes
+- Agujeros para pasacables en todos los lados
+- Soporte para tuercas de latón termofusibles
+- Junta de silicona opcional para sellado
+- Sin soportes para imprimir
 
-**Dimensiones sugeridas para personalizar**:
-- Versión Básica: 110 x 90 x 45 mm
-- Versión Premium: 140 x 100 x 65 mm
+**Cómo usar**:
+1. Descargar OpenSCAD gratis de https://openscad.org/
+2. Abrir el archivo .scad
+3. Ir a View > Customizer
+4. Ajustar dimensiones y exportar STL
+
+**Dimensiones sugeridas**:
+- Versión Básica: 120 x 100 x 50 mm interno
+- Versión Premium: 150 x 110 x 70 mm interno
 
 ---
 
-## Opción 2: ESP32 Project Enclosure
-**Link**: https://www.thingiverse.com/thing:5100184
+## Opción 2: ESP32 Project Box con OLED (PRINTABLES)
+**Link**: https://www.printables.com/model/94864-esp32-project-enclosure-with-oled-ssd1306-096
 
-- Diseñada específicamente para ESP32
-- Tiene espacio para OLED (si querés agregar pantalla)
+- Diseñada para ESP32 WROOM
+- Espacio para pantalla OLED 0.96"
 - Accesos para cables
-
----
-
-## Opción 3: Box for ESP32 ESP-WROOM-32
-**Link**: https://www.thingiverse.com/thing:4685738
-
-- Simple y funcional
 - Fácil de imprimir
-- Puede necesitar modificación para agregar borneras
 
 ---
 
-## Opción 4: Caja Genérica Parametrizable
-**Link**: https://www.thingiverse.com/thing:3436669
+## Opción 3: ESP32-WROOM Project Box con montaje (PRINTABLES)
+**Link**: https://www.printables.com/model/957537-esp32-wroom-project-box-with-mount
 
-- Totalmente parametrizable
-- Podés definir dimensiones exactas
-- Agregar agujeros para borneras y cables
+- Con pestañas de montaje para tornillos M3
+- Buena ventilación
+- Variantes con y sin tabs
+
+---
+
+## Opción 4: ESP32 DevKitV1 Enclosure (PRINTABLES)
+**Link**: https://www.printables.com/model/273739-esp32-devkitv1-enclosure-case
+
+- Simple y compacta
+- Para ESP32 DevKit V1
 
 ---
 
