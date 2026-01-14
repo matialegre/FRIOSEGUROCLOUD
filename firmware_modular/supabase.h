@@ -313,6 +313,83 @@ void supabaseSendMaintenanceLog(float compressorHours, int compressorStarts,
 }
 
 // ============================================
+// LEER CONFIGURACIÓN DESDE SUPABASE
+// ============================================
+bool supabaseFetchConfig() {
+  if (!config.supabaseEnabled || !state.internetAvailable) return false;
+  
+  HTTPClient http;
+  String url = String(SUPABASE_URL) + "/rest/v1/devices";
+  url += "?device_id=eq." + String(DEVICE_ID);
+  url += "&select=temp_critical,alert_delay_sec,defrost_cooldown_sec,door_open_max_sec";
+  
+  http.begin(url);
+  http.addHeader("apikey", SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
+  
+  int code = http.GET();
+  
+  if (code == 200) {
+    String response = http.getString();
+    http.end();
+    
+    // Parse JSON array
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, response);
+    
+    if (error || doc.size() == 0) {
+      Serial.println("[SUPABASE] ✗ Error parseando config");
+      return false;
+    }
+    
+    JsonObject device = doc[0];
+    
+    // Leer valores de Supabase
+    float newTempCritical = device["temp_critical"] | config.tempCritical;
+    int newAlertDelay = device["alert_delay_sec"] | config.alertDelaySec;
+    int newDefrostCooldown = device["defrost_cooldown_sec"] | config.defrostCooldownSec;
+    int newDoorMax = device["door_open_max_sec"] | config.doorOpenMaxSec;
+    
+    // Solo actualizar si hay cambios
+    bool changed = false;
+    
+    if (abs(newTempCritical - config.tempCritical) > 0.1) {
+      Serial.printf("[SUPABASE] Config: tempCritical %.1f -> %.1f\n", config.tempCritical, newTempCritical);
+      config.tempCritical = newTempCritical;
+      changed = true;
+    }
+    
+    if (newAlertDelay != config.alertDelaySec) {
+      Serial.printf("[SUPABASE] Config: alertDelay %d -> %d\n", config.alertDelaySec, newAlertDelay);
+      config.alertDelaySec = newAlertDelay;
+      changed = true;
+    }
+    
+    if (newDefrostCooldown != config.defrostCooldownSec) {
+      Serial.printf("[SUPABASE] Config: defrostCooldown %d -> %d\n", config.defrostCooldownSec, newDefrostCooldown);
+      config.defrostCooldownSec = newDefrostCooldown;
+      changed = true;
+    }
+    
+    if (newDoorMax != config.doorOpenMaxSec) {
+      Serial.printf("[SUPABASE] Config: doorMax %d -> %d\n", config.doorOpenMaxSec, newDoorMax);
+      config.doorOpenMaxSec = newDoorMax;
+      changed = true;
+    }
+    
+    if (changed) {
+      saveConfig();  // Guardar en flash
+      Serial.println("[SUPABASE] ✓ Config sincronizada desde la nube");
+    }
+    
+    return true;
+  }
+  
+  http.end();
+  return false;
+}
+
+// ============================================
 // VERIFICAR COMANDOS PENDIENTES
 // ============================================
 String supabaseCheckCommands() {
@@ -376,13 +453,23 @@ void supabaseSync() {
     }
   }
   
-  // Actualizar estado del dispositivo (online + IP) cada 60 segundos
+  // Actualizar estado del dispositivo cada 60 segundos
   static unsigned long lastDeviceUpdate = 0;
   if (now - lastDeviceUpdate >= 60000) {
     lastDeviceUpdate = now;
     
     if (state.internetAvailable) {
       supabaseUpdateDeviceStatus(true);
+    }
+  }
+  
+  // Sincronizar configuración desde Supabase cada 30 segundos
+  static unsigned long lastConfigSync = 0;
+  if (now - lastConfigSync >= 30000) {
+    lastConfigSync = now;
+    
+    if (state.internetAvailable) {
+      supabaseFetchConfig();
     }
   }
   

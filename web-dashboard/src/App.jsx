@@ -71,6 +71,70 @@ function Dashboard({ user, onLogout }) {
     })
   }
 
+  // Solicitar permiso de notificaciones al cargar
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
+  // Notificar cuando hay alertas nuevas
+  const [lastAlertCount, setLastAlertCount] = useState(0)
+  useEffect(() => {
+    if (alerts.length > lastAlertCount && lastAlertCount > 0) {
+      // Hay alertas nuevas
+      const newAlerts = alerts.slice(0, alerts.length - lastAlertCount)
+      newAlerts.forEach(alert => {
+        showNotification(alert)
+      })
+    }
+    setLastAlertCount(alerts.length)
+  }, [alerts.length])
+
+  // Mostrar notificación del navegador
+  const showNotification = (alert) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification('🚨 ALERTA FrioSeguro', {
+        body: `${alert.device_id}: ${alert.message || 'Alerta activa'}`,
+        icon: '/favicon.ico',
+        tag: `alert-${alert.id}`,
+        requireInteraction: true
+      })
+      
+      notification.onclick = () => {
+        window.focus()
+        notification.close()
+      }
+    }
+    
+    // También reproducir sonido de alerta
+    playAlertSound()
+  }
+
+  // Reproducir sonido de alerta
+  const playAlertSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.value = 800
+      oscillator.type = 'square'
+      gainNode.gain.value = 0.3
+      
+      oscillator.start()
+      setTimeout(() => {
+        oscillator.stop()
+        audioContext.close()
+      }, 500)
+    } catch (e) {
+      console.log('No se pudo reproducir sonido')
+    }
+  }
+
   // Auto-refresh cada 5 segundos
   useEffect(() => {
     loadData()
