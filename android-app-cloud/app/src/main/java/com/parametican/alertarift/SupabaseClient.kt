@@ -36,7 +36,8 @@ object SupabaseClient {
         val cooldownRemainingSec: Int,
         val relayOn: Boolean,
         val uptimeSec: Long?,
-        val simulationMode: Boolean
+        val simulationMode: Boolean,
+        val readingCreatedAt: String?  // Timestamp de la última lectura del ESP
     )
     
     data class Alert(
@@ -104,7 +105,8 @@ object SupabaseClient {
                     cooldownRemainingSec = reading?.optInt("cooldown_remaining_sec", 0) ?: 0,
                     relayOn = reading?.optBoolean("relay_on", false) ?: false,
                     uptimeSec = reading?.optLong("uptime_sec", 0),
-                    simulationMode = reading?.optBoolean("simulation_mode", false) ?: false
+                    simulationMode = reading?.optBoolean("simulation_mode", false) ?: false,
+                    readingCreatedAt = reading?.optString("created_at", null)
                 ))
             }
         } catch (e: Exception) {
@@ -148,7 +150,8 @@ object SupabaseClient {
                 cooldownRemainingSec = reading?.optInt("cooldown_remaining_sec", 0) ?: 0,
                 relayOn = reading?.optBoolean("relay_on", false) ?: false,
                 uptimeSec = reading?.optLong("uptime_sec", 0),
-                simulationMode = reading?.optBoolean("simulation_mode", false) ?: false
+                simulationMode = reading?.optBoolean("simulation_mode", false) ?: false,
+                readingCreatedAt = reading?.optString("created_at", null)
             )
         } catch (e: Exception) {
             e.printStackTrace()

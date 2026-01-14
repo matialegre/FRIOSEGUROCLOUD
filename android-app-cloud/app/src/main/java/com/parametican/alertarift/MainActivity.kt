@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvConnectionStatus: TextView
     private lateinit var tvLastUpdate: TextView
+    private lateinit var tvReadingAge: TextView
     private lateinit var tvTemperature: TextView
     private lateinit var tvTemp1: TextView
     private lateinit var tvTemp2: TextView
@@ -67,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     private fun initViews() {
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
         tvLastUpdate = findViewById(R.id.tvLastUpdate)
+        tvReadingAge = findViewById(R.id.tvReadingAge)
         tvTemperature = findViewById(R.id.tvTemperature)
         tvTemp1 = findViewById(R.id.tvTemp1)
         tvTemp2 = findViewById(R.id.tvTemp2)
@@ -359,6 +361,9 @@ class MainActivity : AppCompatActivity() {
         // Simulación
         simBadge.visibility = if (device.simulationMode) View.VISIBLE else View.GONE
         
+        // Antigüedad de la lectura del ESP
+        updateReadingAge(device.readingCreatedAt)
+        
         // Alerta
         if (device.alertActive) {
             alertBanner.visibility = View.VISIBLE
@@ -445,5 +450,56 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("No", null)
             .show()
+    }
+    
+    private fun updateReadingAge(createdAt: String?) {
+        if (createdAt == null) {
+            tvReadingAge.text = "📡 Lectura ESP: Sin datos"
+            tvReadingAge.setTextColor(Color.parseColor("#F44336"))
+            return
+        }
+        
+        try {
+            // Parse ISO 8601 timestamp from Supabase
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            
+            // Handle different timestamp formats
+            val cleanTimestamp = createdAt.replace("+00", "").split(".")[0]
+            val readingTime = sdf.parse(cleanTimestamp)
+            
+            if (readingTime == null) {
+                tvReadingAge.text = "📡 Lectura ESP: Error"
+                tvReadingAge.setTextColor(Color.parseColor("#F44336"))
+                return
+            }
+            
+            val now = java.util.Date()
+            val diffMs = now.time - readingTime.time
+            val diffSec = diffMs / 1000
+            val diffMin = diffSec / 60
+            val diffHours = diffMin / 60
+            val diffDays = diffHours / 24
+            
+            val text = when {
+                diffDays > 0 -> "hace ${diffDays} día${if (diffDays > 1) "s" else ""}"
+                diffHours > 0 -> "hace ${diffHours} hora${if (diffHours > 1) "s" else ""}"
+                diffMin > 0 -> "hace ${diffMin} min"
+                else -> "hace ${diffSec} seg"
+            }
+            
+            // Color según antigüedad
+            val color = when {
+                diffMin >= 5 || diffHours > 0 || diffDays > 0 -> "#F44336"  // Rojo - muy viejo
+                diffMin >= 1 -> "#FF9800"  // Naranja - algo viejo
+                else -> "#22c55e"  // Verde - fresco
+            }
+            
+            tvReadingAge.text = "📡 Lectura ESP: $text"
+            tvReadingAge.setTextColor(Color.parseColor(color))
+        } catch (e: Exception) {
+            tvReadingAge.text = "📡 Lectura ESP: --"
+            tvReadingAge.setTextColor(Color.parseColor("#888888"))
+        }
     }
 }
