@@ -189,6 +189,26 @@ body {
   border-color: rgba(239, 68, 68, 0.5);
 }
 
+/* Reading time indicator */
+.reading-time {
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.reading-time.stale {
+  color: #f97316;
+}
+
+.reading-time.very-stale {
+  color: #ef4444;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Device Selector */
 .device-selector {
   display: flex;

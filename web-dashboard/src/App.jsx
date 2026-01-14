@@ -143,6 +143,31 @@ function Dashboard({ user, onLogout }) {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
+  // Formatear hace cuánto fue la última lectura del ESP
+  const getReadingAge = (createdAt) => {
+    if (!createdAt) return { text: 'Sin datos', status: 'offline' }
+    const readingTime = new Date(createdAt)
+    const now = new Date()
+    const diffMs = now - readingTime
+    const diffSec = Math.floor(diffMs / 1000)
+    const diffMin = Math.floor(diffSec / 60)
+    const diffHours = Math.floor(diffMin / 60)
+    const diffDays = Math.floor(diffHours / 24)
+    
+    let text
+    if (diffDays > 0) text = `hace ${diffDays} día${diffDays > 1 ? 's' : ''}`
+    else if (diffHours > 0) text = `hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`
+    else if (diffMin > 0) text = `hace ${diffMin} min`
+    else text = `hace ${diffSec} seg`
+    
+    // Status: fresh (<1min), stale (1-5min), very-stale (>5min)
+    let status = 'fresh'
+    if (diffMin >= 5 || diffHours > 0 || diffDays > 0) status = 'very-stale'
+    else if (diffMin >= 1) status = 'stale'
+    
+    return { text, status }
+  }
+
   // Obtener estado del sistema con información clara
   const getSystemState = (reading) => {
     if (!reading) return { state: 'OFFLINE', label: 'Sin datos', color: '#6b7280', icon: '📴' }
@@ -376,6 +401,17 @@ function Dashboard({ user, onLogout }) {
               <span className={selectedDevice.is_online ? 'online-text' : 'offline-text'}>
                 {selectedDevice.is_online ? '🟢 Online' : '🔴 Offline'}
               </span>
+            </div>
+            <div className="info-row">
+              <span>📡 Última lectura ESP:</span>
+              {(() => {
+                const age = getReadingAge(reading?.createdAt)
+                return (
+                  <span className={`reading-time ${age.status}`}>
+                    {age.text}
+                  </span>
+                )
+              })()}
             </div>
           </div>
 
