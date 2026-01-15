@@ -1,4 +1,4 @@
-#Sun Jan 11 19:57:18 ART 2026
+#Thu Jan 15 00:21:27 ART 2026
 base.2=C\:\\Users\\alegr\\OneDrive\\Desktop\\alda\\campamento-parametican\\android-app\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\7\\classes.dex
 path.2=7/classes.dex
 base.1=C\:\\Users\\alegr\\OneDrive\\Desktop\\alda\\campamento-parametican\\android-app\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex

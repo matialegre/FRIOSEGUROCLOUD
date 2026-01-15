@@ -50,6 +50,7 @@ id tvDoorStatus
 id tvInternet
 id tvLastUpdate
 id tvLocation
+id tvReadingAge
 id tvReeferId
 id tvReeferName
 id tvReeferStatus

@@ -331,6 +331,16 @@
                 android:textColor="#475569"
                 android:textSize="12sp"
                 android:layout_marginTop="8dp" />
+
+            <TextView
+                android:id="@+id/tvReadingAge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📡 Lectura ESP: --"
+                android:textColor="#22c55e"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
 
         <!-- Botones ocultos para compatibilidad -->
