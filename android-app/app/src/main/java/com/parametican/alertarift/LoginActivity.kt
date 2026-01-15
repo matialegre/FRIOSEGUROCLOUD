@@ -20,6 +20,13 @@ class LoginActivity : AppCompatActivity() {
         const val UDP_DISCOVERY_PORT = 5555
         const val UDP_DISCOVERY_MAGIC = "REEFER_DISCOVER"
         const val UDP_DISCOVERY_RESPONSE = "REEFER_HERE"
+        
+        // Supabase para obtener IP del ESP
+        const val SUPABASE_URL = "https://zojiknjxaohxbetxnjhv.supabase.co"
+        const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvamtrbmp4YW9oeGJldHhuamh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNTg2MzMsImV4cCI6MjA2MjczNDYzM30.QhMQ7hXX7wFBeh0V-ykXhvLgXnJPOE9d3mFN3CdJqYo"
+        
+        // Device IDs conocidos para buscar
+        val KNOWN_DEVICE_IDS = listOf("REEFER_01_SCZ", "REEFER_02_SCZ", "REEFER_DEV_BHI")
     }
     
     private var isSearching = AtomicBoolean(false)
@@ -76,16 +83,68 @@ class LoginActivity : AppCompatActivity() {
     }
     
     /**
+     * Obtiene la IP del ESP desde Supabase (si hay internet)
+     */
+    private fun getIpFromSupabase(): String? {
+        try {
+            for (deviceId in KNOWN_DEVICE_IDS) {
+                val url = URL("$SUPABASE_URL/rest/v1/devices?device_id=eq.$deviceId&select=ip_address,is_online")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                
+                if (conn.responseCode == 200) {
+                    val response = conn.inputStream.bufferedReader().readText()
+                    conn.disconnect()
+                    
+                    // Parse simple JSON: [{"ip_address":"192.168.x.x","is_online":true}]
+                    if (response.contains("\"is_online\":true") && response.contains("\"ip_address\":\"")) {
+                        val ipStart = response.indexOf("\"ip_address\":\"") + 14
+                        val ipEnd = response.indexOf("\"", ipStart)
+                        if (ipStart > 14 && ipEnd > ipStart) {
+                            val ip = response.substring(ipStart, ipEnd)
+                            if (ip.isNotEmpty() && ip != "null") {
+                                android.util.Log.d("LoginActivity", "Supabase: $deviceId está online en $ip")
+                                return ip
+                            }
+                        }
+                    }
+                } else {
+                    conn.disconnect()
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("LoginActivity", "Error consultando Supabase: ${e.message}")
+        }
+        return null
+    }
+    
+    /**
      * Busca el dispositivo ESP32 en la red:
-     * 1. Primero intenta mDNS (reefer.local)
-     * 2. Si falla, usa UDP Broadcast Discovery (funciona en cualquier red)
+     * 1. Primero consulta Supabase para obtener la IP (si hay internet)
+     * 2. Si falla, intenta mDNS (reefer.local)
+     * 3. Si falla, usa UDP Broadcast Discovery
      */
     private fun searchForDevice(etServerIp: EditText, tvStatus: TextView) {
         isSearching.set(true)
         foundDevice.set(false)
         
         thread {
-            // Paso 1: Intentar mDNS primero (es lo más rápido si funciona)
+            // Paso 1: Consultar Supabase para obtener IP del ESP
+            runOnUiThread { tvStatus.text = "☁️ Consultando nube..." }
+            
+            val cloudIp = getIpFromSupabase()
+            if (cloudIp != null) {
+                runOnUiThread { tvStatus.text = "🔍 Verificando $cloudIp (desde nube)..." }
+                if (tryConnect(cloudIp)) {
+                    onDeviceFound(cloudIp, etServerIp, tvStatus)
+                    return@thread
+                }
+            }
+            
+            // Paso 2: Intentar mDNS
             runOnUiThread { tvStatus.text = "🔍 Intentando mDNS (reefer.local)..." }
             
             if (tryConnect("reefer.local")) {
@@ -93,8 +152,7 @@ class LoginActivity : AppCompatActivity() {
                 return@thread
             }
             
-            // Paso 2: UDP Broadcast Discovery
-            // Envía un broadcast a toda la red, el ESP32 responde con su IP
+            // Paso 3: UDP Broadcast Discovery
             runOnUiThread { tvStatus.text = "🔍 Enviando broadcast UDP..." }
             
             val discoveredIp = udpDiscovery()
