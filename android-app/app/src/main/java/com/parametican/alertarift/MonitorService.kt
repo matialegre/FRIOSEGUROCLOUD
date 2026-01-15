@@ -249,19 +249,25 @@ class MonitorService : Service() {
                 .sendBroadcast(updateIntent)
             
             if (hasAlert) {
-                // Solo activar sonido/vibración si NO fue silenciada (acknowledged)
-                if (!this.alertActive && !alertAcknowledged) {
-                    triggerAlarm(alertMessage)
-                } else if (alertAcknowledged && this.alertActive) {
-                    // Fue silenciada - parar sonido pero mantener notificación visual
-                    stopAlarmSound()
-                    stopVibration()
-                }
-                // Actualizar notificación con estado de alerta (silenciada o no)
                 if (alertAcknowledged) {
+                    // Alerta silenciada - parar sonido pero mostrar notificación
+                    if (this.alertActive) {
+                        stopAlarmSound()
+                        stopVibration()
+                    }
                     updateNotification("⚠️ ALERTA SILENCIADA - $lastData")
+                } else {
+                    // Alerta activa NO silenciada
+                    if (!this.alertActive) {
+                        // Primera vez que vemos la alerta - disparar alarma completa
+                        triggerAlarm(alertMessage)
+                    } else {
+                        // Ya estamos en alerta - solo actualizar notificación
+                        updateNotification("🚨 ALERTA ACTIVA - $lastData")
+                    }
                 }
             } else {
+                // No hay alerta
                 if (this.alertActive) {
                     stopAlarm()
                 }
