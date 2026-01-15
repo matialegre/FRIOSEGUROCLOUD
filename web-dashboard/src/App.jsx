@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getDevicesWithReadings, getDeviceConfig, updateDeviceConfig, getActiveAlerts, acknowledgeAlert, resolveAlert, silenceDeviceAlert } from './supabaseClient'
+import { AppLogger } from './AppLogger'
 import Login from './Login'
 import './App.css'
 
@@ -32,6 +33,9 @@ function Dashboard({ user, onLogout }) {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [savingConfig, setSavingConfig] = useState(false)
   const [configCountdown, setConfigCountdown] = useState(0)
+  const [showLogs, setShowLogs] = useState(false)
+  const [logs, setLogs] = useState([])
+  const logsEndRef = useRef(null)
 
   // Obtener dispositivo seleccionado de la lista (sin fallback automático)
   const selectedDevice = selectedDeviceId ? devices.find(d => d.device_id === selectedDeviceId) : null
@@ -141,6 +145,26 @@ function Dashboard({ user, onLogout }) {
     const interval = setInterval(loadData, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  // Listener para logs
+  useEffect(() => {
+    setLogs(AppLogger.getLogs())
+    const unsubscribe = AppLogger.addListener((entry) => {
+      if (entry) {
+        setLogs(prev => [...prev.slice(-499), entry])
+      } else {
+        setLogs([])
+      }
+    })
+    return unsubscribe
+  }, [])
+
+  // Auto-scroll logs
+  useEffect(() => {
+    if (showLogs && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [logs, showLogs])
 
   // Cargar config cuando cambia el dispositivo
   useEffect(() => {
@@ -332,6 +356,21 @@ function Dashboard({ user, onLogout }) {
           <span className="update-time">
             {lastUpdate ? `Actualizado: ${lastUpdate.toLocaleTimeString()}` : ''}
           </span>
+          <button 
+            className="logs-btn" 
+            onClick={() => setShowLogs(!showLogs)}
+            style={{
+              background: showLogs ? '#8b5cf6' : '#374151',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              marginRight: '10px'
+            }}
+          >
+            📋 LOGS {logs.length > 0 && `(${logs.length})`}
+          </button>
           <div className="user-info">
             <span className="user-name">👤 {user}</span>
             <button className="logout-btn" onClick={onLogout}>
@@ -654,8 +693,72 @@ function Dashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Panel de LOGS */}
+      {showLogs && (
+        <div className="logs-panel" style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '300px',
+          background: '#0f0f1a',
+          borderTop: '2px solid #8b5cf6',
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 1000
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '8px 16px',
+            background: '#1a1a2e',
+            borderBottom: '1px solid #333'
+          }}>
+            <span style={{ color: 'white', fontWeight: 'bold' }}>📋 LOGS DEL SISTEMA ({logs.length})</span>
+            <div>
+              <button 
+                onClick={() => { AppLogger.clear(); setLogs([]) }}
+                style={{ background: '#dc2626', color: 'white', border: 'none', padding: '4px 12px', borderRadius: '4px', marginRight: '8px', cursor: 'pointer' }}
+              >
+                🗑️ Limpiar
+              </button>
+              <button 
+                onClick={() => setShowLogs(false)}
+                style={{ background: '#374151', color: 'white', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+          </div>
+          <div style={{
+            flex: 1,
+            overflow: 'auto',
+            padding: '8px',
+            fontFamily: 'monospace',
+            fontSize: '12px'
+          }}>
+            {logs.map((log, index) => (
+              <div key={log.id || index} style={{
+                padding: '4px 8px',
+                borderBottom: '1px solid #222',
+                background: index % 2 === 0 ? '#0f0f1a' : '#1a1a2e'
+              }}>
+                <span style={{ color: '#666', marginRight: '8px' }}>{log.formattedTime}</span>
+                <span style={{ color: '#888', marginRight: '8px' }}>[{log.tag}]</span>
+                <span style={{ color: log.color }}>{log.icon} {log.message}</span>
+                {log.details && (
+                  <div style={{ color: '#666', marginLeft: '120px', fontSize: '11px' }}>{log.details}</div>
+                )}
+              </div>
+            ))}
+            <div ref={logsEndRef} />
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
-      <footer className="footer">
+      <footer className="footer" style={{ marginBottom: showLogs ? '300px' : 0 }}>
         <div className="footer-brands">
           <span>🏔️ Pan American Silver</span>
           <span className="footer-separator">•</span>

@@ -1,9 +1,12 @@
 // Cliente Supabase usando fetch directo (sin SDK)
+import { AppLogger } from './AppLogger'
+
 const SUPABASE_URL = 'https://xhdeacnwdzvkivfjzard.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_JhTUv1X2LHMBVILUaysJ3g_Ho11zu-Q'
 
 // Helper para hacer requests a Supabase REST API
 async function supabaseGet(endpoint) {
+  AppLogger.supabaseRequest(endpoint, 'GET')
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
     headers: {
       'apikey': SUPABASE_KEY,
@@ -13,12 +16,16 @@ async function supabaseGet(endpoint) {
   })
   if (!response.ok) {
     const error = await response.json()
+    AppLogger.supabaseResponse(endpoint, response.status, JSON.stringify(error))
     throw error
   }
-  return response.json()
+  const data = await response.json()
+  AppLogger.supabaseResponse(endpoint, response.status, JSON.stringify(data).substring(0, 100))
+  return data
 }
 
 async function supabasePatch(endpoint, body) {
+  AppLogger.supabaseRequest(endpoint, 'PATCH', JSON.stringify(body))
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
     method: 'PATCH',
     headers: {
@@ -31,9 +38,12 @@ async function supabasePatch(endpoint, body) {
   })
   if (!response.ok) {
     const error = await response.json()
+    AppLogger.supabaseResponse(endpoint, response.status, JSON.stringify(error))
     throw error
   }
-  return response.json()
+  const data = await response.json()
+  AppLogger.supabaseResponse(endpoint, response.status, 'OK')
+  return data
 }
 
 // Obtener todos los dispositivos con su última lectura
@@ -156,6 +166,7 @@ export async function resolveAlert(alertId) {
 
 // Helper para POST
 async function supabasePost(endpoint, body) {
+  AppLogger.supabaseRequest(endpoint, 'POST', JSON.stringify(body))
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
     method: 'POST',
     headers: {
@@ -168,9 +179,12 @@ async function supabasePost(endpoint, body) {
   })
   if (!response.ok) {
     const error = await response.json()
+    AppLogger.supabaseResponse(endpoint, response.status, JSON.stringify(error))
     throw error
   }
-  return response.json()
+  const data = await response.json()
+  AppLogger.supabaseResponse(endpoint, response.status, 'OK')
+  return data
 }
 
 // Enviar comando SILENCE al ESP32 para silenciar sirena/relay
