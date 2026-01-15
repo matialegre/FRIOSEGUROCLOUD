@@ -153,3 +153,72 @@ export async function resolveAlert(alertId) {
     return false
   }
 }
+
+// Helper para POST
+async function supabasePost(endpoint, body) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(body)
+  })
+  if (!response.ok) {
+    const error = await response.json()
+    throw error
+  }
+  return response.json()
+}
+
+// Enviar comando SILENCE al ESP32 para silenciar sirena/relay
+export async function sendSilenceCommand(deviceId) {
+  try {
+    // 1. Enviar comando SILENCE a la tabla commands
+    await supabasePost('commands', {
+      device_id: deviceId,
+      command: 'SILENCE',
+      status: 'pending',
+      source: 'web_dashboard'
+    })
+    
+    // 2. Marcar flag en devices para redundancia
+    await supabasePatch(`devices?device_id=eq.${deviceId}`, {
+      alert_acknowledged_remote: true
+    })
+    
+    // 3. Marcar alert_acknowledged en la última lectura
+    await supabasePatch(`readings?device_id=eq.${deviceId}&order=created_at.desc&limit=1`, {
+      alert_acknowledged: true
+    })
+    
+    console.log('✓ Comando SILENCE enviado a', deviceId)
+    return true
+  } catch (error) {
+    console.error('Error sending silence command:', error)
+    return false
+  }
+}
+
+// Silenciar alerta completa (ESP32 + apps + base de datos)
+export async function silenceDeviceAlert(deviceId) {
+  try {
+    // Enviar comando al ESP32
+    await sendSilenceCommand(deviceId)
+    
+    // Marcar alertas activas del dispositivo como acknowledged
+    const alerts = await getActiveAlerts()
+    const deviceAlerts = alerts.filter(a => a.device_id === deviceId)
+    
+    for (const alert of deviceAlerts) {
+      await acknowledgeAlert(alert.id)
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Error silencing device alert:', error)
+    return false
+  }
+}

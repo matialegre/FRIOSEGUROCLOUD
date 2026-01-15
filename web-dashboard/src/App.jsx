@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getDevicesWithReadings, getDeviceConfig, updateDeviceConfig, getActiveAlerts, acknowledgeAlert, resolveAlert } from './supabaseClient'
+import { getDevicesWithReadings, getDeviceConfig, updateDeviceConfig, getActiveAlerts, acknowledgeAlert, resolveAlert, silenceDeviceAlert } from './supabaseClient'
 import Login from './Login'
 import './App.css'
 
@@ -567,8 +567,8 @@ function Dashboard({ user, onLogout }) {
                 <p className="alert-message">{alert.message}</p>
                 <div className="alert-actions">
                   {!alert.acknowledged && (
-                    <button onClick={() => acknowledgeAlert(alert.id).then(loadData)}>
-                      ✓ Reconocer
+                    <button onClick={() => silenceDeviceAlert(alert.device_id).then(loadData)}>
+                      🔕 Silenciar
                     </button>
                   )}
                   <button onClick={() => resolveAlert(alert.id).then(loadData)}>
