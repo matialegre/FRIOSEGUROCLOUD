@@ -295,12 +295,27 @@ function Dashboard({ user, onLogout }) {
       }
     }
     
+    // Mostrar cronómetro si la temperatura está sobre el crítico pero aún no hay alerta
+    if (reading.tempOverCritical && !reading.alertActive && reading.highTempElapsedSec > 0) {
+      const elapsed = reading.highTempElapsedSec
+      const delay = config?.alert_delay_sec || 60
+      const remaining = Math.max(0, delay - elapsed)
+      return { 
+        state: 'WARNING', 
+        label: `⏱️ ALERTA EN ${remaining}s (${elapsed}/${delay}s)`, 
+        color: '#f59e0b', 
+        icon: '⚠️',
+        blocked: false
+      }
+    }
+    
     if (reading.alertActive || state === 'ALERT') {
+      const label = reading.alertAcknowledged ? '🔕 ALERTA SILENCIADA' : 'ALERTA ACTIVA'
       return { 
         state: 'ALERT', 
-        label: 'ALERTA ACTIVA', 
-        color: '#ef4444', 
-        icon: '🚨',
+        label: label, 
+        color: reading.alertAcknowledged ? '#8b5cf6' : '#ef4444', 
+        icon: reading.alertAcknowledged ? '🔕' : '🚨',
         blocked: false
       }
     }
