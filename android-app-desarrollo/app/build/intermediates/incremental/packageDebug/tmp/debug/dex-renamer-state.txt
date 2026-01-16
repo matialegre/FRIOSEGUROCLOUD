@@ -1,4 +1,4 @@
-#Thu Jan 15 23:12:40 ART 2026
+#Fri Jan 16 00:06:00 ART 2026
 base.2=C\:\\Users\\alegr\\OneDrive\\Desktop\\FRIOSEGUROCLOUD-master\\FRIOSEGUROCLOUD-master\\android-app-desarrollo\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\7\\classes.dex
 path.2=7/classes.dex
 base.1=C\:\\Users\\alegr\\OneDrive\\Desktop\\FRIOSEGUROCLOUD-master\\FRIOSEGUROCLOUD-master\\android-app-desarrollo\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex

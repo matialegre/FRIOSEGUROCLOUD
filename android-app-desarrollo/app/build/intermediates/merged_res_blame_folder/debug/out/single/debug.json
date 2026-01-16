@@ -1,74 +1,70 @@
 [
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\mipmap-hdpi_ic_launcher.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\mipmap-hdpi\\ic_launcher.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/layout_activity_alert.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/layout/activity_alert.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_ic_rift_logo.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\ic_rift_logo.xml"
-    },
-    {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_item_reefer.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\item_reefer.xml"
-    },
-    {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_dialog_config.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\dialog_config.xml"
-    },
-    {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_bg_status_online.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\bg_status_online.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/mipmap-hdpi_ic_launcher.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/mipmap-hdpi/ic_launcher.xml"
     },
     {
         "merged": "com.parametican.alertarift.app-merged_res-31:/layout_activity_main.xml.flat",
         "source": "com.parametican.alertarift.app-main-33:/layout/activity_main.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_bg_card.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\bg_card.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/layout_activity_login.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/layout/activity_login.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_activity_login.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\activity_login.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_ic_rift_logo.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/ic_rift_logo.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_bg_status_badge.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\bg_status_badge.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_bg_status_badge.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/bg_status_badge.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_item_rift.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\item_rift.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/layout_item_rift.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/layout/item_rift.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_activity_main.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\activity_main.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_bg_alert_banner.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/bg_alert_banner.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_dialog_telegram.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\dialog_telegram.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/layout_item_reefer.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/layout/item_reefer.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_activity_splash.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\activity_splash.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_bg_input.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/bg_input.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_bg_alert_banner.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\bg_alert_banner.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_bg_status_online.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/bg_status_online.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\layout_activity_alert.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\layout\\activity_alert.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_ic_launcher.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/ic_launcher.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_bg_input.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\bg_input.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_bg_card.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/bg_card.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_ic_launcher.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\ic_launcher.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/drawable_bg_status_offline.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/drawable/bg_status_offline.xml"
     },
     {
-        "merged": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-merged_res-31:\\drawable_bg_status_offline.xml.flat",
-        "source": "C:\\Users\\alegr\\.gradle\\daemon\\8.0\\com.parametican.alertarift.app-main-33:\\drawable\\bg_status_offline.xml"
+        "merged": "com.parametican.alertarift.app-merged_res-31:/layout_dialog_config.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/layout/dialog_config.xml"
+    },
+    {
+        "merged": "com.parametican.alertarift.app-merged_res-31:/layout_activity_splash.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/layout/activity_splash.xml"
+    },
+    {
+        "merged": "com.parametican.alertarift.app-merged_res-31:/layout_dialog_telegram.xml.flat",
+        "source": "com.parametican.alertarift.app-main-33:/layout/dialog_telegram.xml"
     }
 ]
