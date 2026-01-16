@@ -32,6 +32,8 @@
 // Desarrollo Bahía Blanca: REEFER_DEV_BHI
 //
 // IMPORTANTE: Cambiar esto para cada dispositivo físico!
+#define DEVICE_ID "REEFER_DEV_BHI"
+#define DEVICE_NAME "Reefer Desarrollo"
 
 // ============================================
 // TELEGRAM (para alertas cuando hay internet)
