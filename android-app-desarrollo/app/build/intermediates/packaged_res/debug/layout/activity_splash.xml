@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#0f172a">
+
+    <ImageView
+        android:id="@+id/ivLogo"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@drawable/ic_rift_logo"
+        android:contentDescription="Logo" />
+
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="REEFER Monitor"
+        android:textColor="#60a5fa"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:layout_marginTop="24dp"
+        android:alpha="0" />
+
+    <TextView
+        android:id="@+id/tvSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Parametican Silver"
+        android:textColor="#94a3b8"
+        android:textSize="16sp"
+        android:layout_marginTop="8dp"
+        android:alpha="0" />
+
+    <ProgressBar
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginTop="48dp"
+        android:indeterminateTint="#3b82f6" />
+
+</LinearLayout>

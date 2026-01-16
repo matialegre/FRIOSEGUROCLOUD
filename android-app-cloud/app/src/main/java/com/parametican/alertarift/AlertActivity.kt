@@ -31,6 +31,11 @@ class AlertActivity : AppCompatActivity() {
         btnSilence.setOnClickListener {
             silenceAlarm()
         }
+        
+        // Si viene con auto_silence, silenciar automáticamente
+        if (intent.getBooleanExtra("auto_silence", false)) {
+            silenceAlarm()
+        }
     }
 
     private fun showOnLockScreen() {
@@ -53,15 +58,32 @@ class AlertActivity : AppCompatActivity() {
     }
 
     private fun silenceAlarm() {
+        AppLogger.info("ALERT_ACTIVITY", "🔕 Usuario presionó DETENER ALERTA")
+        
+        // PRIMERO: Detener sonido y vibración inmediatamente
+        MonitorService.silenceAlarm()
+        
         // Versión cloud: silenciar alertas en Supabase
         Thread {
             try {
+                // Obtener alertas activas y silenciarlas
                 val alerts = SupabaseClient.getActiveAlerts()
+                val deviceIds = alerts.map { it.deviceId }.distinct()
+                
+                // Enviar comando SILENCE a cada dispositivo
+                for (deviceId in deviceIds) {
+                    SupabaseClient.sendSilenceCommand(deviceId)
+                    SupabaseClient.acknowledgeDeviceAlert(deviceId)
+                }
+                
+                // Marcar alertas como acknowledged
                 for (alert in alerts) {
                     SupabaseClient.acknowledgeAlert(alert.id)
                 }
+                
+                AppLogger.success("ALERT_ACTIVITY", "Alertas silenciadas en Supabase", "${alerts.size} alertas")
             } catch (e: Exception) {
-                // Ignorar errores
+                AppLogger.error("ALERT_ACTIVITY", "Error silenciando en Supabase", e.message ?: "")
             }
         }.start()
         

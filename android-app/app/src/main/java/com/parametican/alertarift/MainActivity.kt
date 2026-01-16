@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStop: Button
     private lateinit var btnConfig: Button
     private lateinit var btnSilence: Button
+    private lateinit var btnRelayOff: Button
     private lateinit var btnLogout: Button
     private lateinit var alertBanner: LinearLayout
     private lateinit var simBadge: LinearLayout
@@ -184,6 +185,7 @@ class MainActivity : AppCompatActivity() {
         btnStop = findViewById(R.id.btnStop)
         btnConfig = findViewById(R.id.btnConfig)
         btnSilence = findViewById(R.id.btnSilence)
+        btnRelayOff = findViewById(R.id.btnRelayOff)
         btnLogout = findViewById(R.id.btnLogout)
         simBadge = findViewById(R.id.simBadge)
         reefersContainer = findViewById(R.id.reefersContainer)
@@ -195,7 +197,243 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadSavedIp() {
         val prefs = getSharedPreferences("parametican", MODE_PRIVATE)
-        etServerIp.setText(prefs.getString("server_ip", "reefer.local"))
+        val savedIp = prefs.getString("server_ip", "")
+        if (savedIp.isNullOrEmpty()) {
+            // No hay IP guardada, intentar descubrir automáticamente
+            etServerIp.setText("Buscando...")
+            discoverEsp32()
+        } else {
+            etServerIp.setText(savedIp)
+        }
+    }
+    
+    // Device ID para buscar en Supabase (REEFER_01_SCZ para Santa Cruz)
+    private val TARGET_DEVICE_ID = "REEFER_01_SCZ"
+    
+    @Volatile private var discoveredIp: String? = null
+    
+    private fun discoverEsp32() {
+        Toast.makeText(this, "🔍 Buscando Reefer en la red (paralelo)...", Toast.LENGTH_SHORT).show()
+        discoveredIp = null
+        
+        // Ejecutar 3 métodos en PARALELO
+        val threads = mutableListOf<Thread>()
+        
+        // Método 1: mDNS (reefer.local)
+        threads.add(thread {
+            tryMdns()
+        })
+        
+        // Método 2: Consultar Supabase por IP del dispositivo
+        threads.add(thread {
+            trySupabaseIp()
+        })
+        
+        // Método 3: Escanear IPs conocidas y rangos Santa Cruz
+        threads.add(thread {
+            tryScanKnownIps()
+        })
+        
+        // Esperar a que alguno encuentre o todos terminen
+        thread {
+            val startTime = System.currentTimeMillis()
+            val timeout = 15000L // 15 segundos máximo
+            
+            while (discoveredIp == null && 
+                   System.currentTimeMillis() - startTime < timeout &&
+                   threads.any { it.isAlive }) {
+                Thread.sleep(200)
+            }
+            
+            // Cancelar threads restantes
+            threads.forEach { if (it.isAlive) it.interrupt() }
+            
+            val finalIp = discoveredIp
+            runOnUiThread {
+                if (finalIp != null) {
+                    etServerIp.setText(finalIp)
+                    getSharedPreferences("parametican", MODE_PRIVATE)
+                        .edit().putString("server_ip", finalIp).apply()
+                    Toast.makeText(this, "✅ Reefer encontrado: $finalIp", Toast.LENGTH_SHORT).show()
+                } else {
+                    etServerIp.setText("")
+                    etServerIp.hint = "IP no encontrada - ingresa manualmente"
+                    Toast.makeText(this, "❌ No se encontró Reefer en la red", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+    
+    private fun tryMdns() {
+        if (discoveredIp != null) return
+        try {
+            val url = URL("http://reefer.local/api/status")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            if (conn.responseCode == 200) {
+                val response = conn.inputStream.bufferedReader().readText()
+                if (response.contains("sensor") && response.contains("system")) {
+                    discoveredIp = "reefer.local"
+                }
+            }
+            conn.disconnect()
+        } catch (e: Exception) {
+            // mDNS no disponible
+        }
+    }
+    
+    private fun trySupabaseIp() {
+        if (discoveredIp != null) return
+        try {
+            // Consultar Supabase para obtener la IP del dispositivo
+            val supabaseUrl = "https://sxjmqxwdqdicxcoascks.supabase.co/rest/v1/device_status?device_id=eq.$TARGET_DEVICE_ID&select=local_ip"
+            val url = URL(supabaseUrl)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            conn.setRequestProperty("apikey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4am1xeHdkcWRpY3hjb2FzY2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNTMwNzcsImV4cCI6MjA2MjcyOTA3N30.lPvnJFxVWjU8CrVPSsNPPHxnBz2xRc8VLvXNfCPKbQU")
+            conn.setRequestProperty("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4am1xeHdkcWRpY3hjb2FzY2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNTMwNzcsImV4cCI6MjA2MjcyOTA3N30.lPvnJFxVWjU8CrVPSsNPPHxnBz2xRc8VLvXNfCPKbQU")
+            
+            if (conn.responseCode == 200) {
+                val response = conn.inputStream.bufferedReader().readText()
+                // Parse JSON para obtener local_ip
+                val ipMatch = Regex("\"local_ip\"\\s*:\\s*\"([^\"]+)\"").find(response)
+                val ip = ipMatch?.groupValues?.get(1)
+                if (!ip.isNullOrEmpty() && ip != "null") {
+                    // Verificar que la IP responde
+                    if (testReeferIp(ip)) {
+                        discoveredIp = ip
+                    }
+                }
+            }
+            conn.disconnect()
+        } catch (e: Exception) {
+            // Error consultando Supabase
+        }
+    }
+    
+    private fun tryScanKnownIps() {
+        if (discoveredIp != null) return
+        
+        // IPs conocidas + rangos Santa Cruz (192.168.224.0 - 192.168.227.255)
+        val knownIps = mutableListOf(
+            // IPs comunes
+            "192.168.1.100", "192.168.1.101", "192.168.0.100", "192.168.0.101",
+            "192.168.4.1",  // AP mode
+            "10.0.0.100",
+            // Santa Cruz específicas
+            "192.168.225.200", "192.168.226.180"
+        )
+        
+        // Agregar rangos Santa Cruz (192.168.224-227.x) - IPs más probables
+        for (thirdOctet in 224..227) {
+            for (lastOctet in listOf(1, 100, 101, 150, 180, 200, 254)) {
+                knownIps.add("192.168.$thirdOctet.$lastOctet")
+            }
+        }
+        
+        // Probar en paralelo con threads
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(10)
+        val futures = knownIps.map { ip ->
+            executor.submit<String?> {
+                if (discoveredIp != null) return@submit null
+                if (testReeferIp(ip)) ip else null
+            }
+        }
+        
+        for (future in futures) {
+            if (discoveredIp != null) break
+            try {
+                val result = future.get(2, java.util.concurrent.TimeUnit.SECONDS)
+                if (result != null && discoveredIp == null) {
+                    discoveredIp = result
+                }
+            } catch (e: Exception) {
+                // Timeout o error
+            }
+        }
+        
+        executor.shutdownNow()
+        
+        // Si aún no encontramos, escanear subred actual
+        if (discoveredIp == null) {
+            scanCurrentSubnet()
+        }
+    }
+    
+    private fun testReeferIp(ip: String): Boolean {
+        return try {
+            val url = URL("http://$ip/api/status")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 1000
+            conn.readTimeout = 1000
+            val success = if (conn.responseCode == 200) {
+                val response = conn.inputStream.bufferedReader().readText()
+                response.contains("sensor") && response.contains("system")
+            } else false
+            conn.disconnect()
+            success
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    private fun scanCurrentSubnet() {
+        if (discoveredIp != null) return
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            @Suppress("DEPRECATION")
+            val wifiInfo = wifiManager.connectionInfo
+            @Suppress("DEPRECATION")
+            val ipInt = wifiInfo.ipAddress
+            
+            if (ipInt == 0) return
+            
+            val baseIp = String.format(
+                "%d.%d.%d",
+                ipInt and 0xff,
+                ipInt shr 8 and 0xff,
+                ipInt shr 16 and 0xff
+            )
+            
+            // Escanear rangos comunes en paralelo
+            val executor = java.util.concurrent.Executors.newFixedThreadPool(20)
+            val ipsToScan = mutableListOf<String>()
+            
+            for (lastOctet in listOf(1, 100, 101, 102, 150, 180, 200, 254)) {
+                ipsToScan.add("$baseIp.$lastOctet")
+            }
+            // Agregar rango 100-120
+            for (lastOctet in 100..120) {
+                if (!ipsToScan.contains("$baseIp.$lastOctet")) {
+                    ipsToScan.add("$baseIp.$lastOctet")
+                }
+            }
+            
+            val futures = ipsToScan.map { ip ->
+                executor.submit<String?> {
+                    if (discoveredIp != null) return@submit null
+                    if (testReeferIp(ip)) ip else null
+                }
+            }
+            
+            for (future in futures) {
+                if (discoveredIp != null) break
+                try {
+                    val result = future.get(1, java.util.concurrent.TimeUnit.SECONDS)
+                    if (result != null && discoveredIp == null) {
+                        discoveredIp = result
+                    }
+                } catch (e: Exception) {
+                    // Continuar
+                }
+            }
+            
+            executor.shutdownNow()
+        } catch (e: Exception) {
+            // Error
+        }
     }
 
     private fun setupButtons() {
@@ -235,6 +473,10 @@ class MainActivity : AppCompatActivity() {
 
         btnSilence.setOnClickListener {
             silenceAlert()
+        }
+        
+        btnRelayOff.setOnClickListener {
+            turnOffRelay()
         }
         
         btnLogout.setOnClickListener {
@@ -604,6 +846,42 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 // Ignorar error del servidor, la alarma local ya se detuvo
+            }
+        }
+    }
+
+    private fun turnOffRelay() {
+        val ip = etServerIp.text.toString().trim()
+        if (ip.isEmpty()) {
+            Toast.makeText(this, "Primero ingresa la IP", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        Toast.makeText(this, "🔌 Apagando relé...", Toast.LENGTH_SHORT).show()
+        
+        thread {
+            try {
+                val url = URL("http://$ip/api/relay")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.connectTimeout = 5000
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.outputStream.write("{\"state\":false}".toByteArray())
+                val code = conn.responseCode
+                conn.disconnect()
+                
+                runOnUiThread {
+                    if (code == 200) {
+                        Toast.makeText(this, "✅ Relé APAGADO", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "❌ Error: código $code", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "❌ Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

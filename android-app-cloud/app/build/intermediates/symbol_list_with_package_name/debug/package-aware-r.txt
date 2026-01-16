@@ -3090,6 +3090,7 @@ id btnConfigTelegram
 id btnConfigWhatsApp
 id btnConnect
 id btnLogout
+id btnRelayOff
 id btnServiceCloud
 id btnServiceMultiReefer
 id btnServiceReports

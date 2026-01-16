@@ -112,6 +112,12 @@ String getEmbeddedHTML() {
       <button class="btn-orange" id="btnDefrost" onclick="toggleDefrost()">🧊 ACTIVAR DESCONGELAMIENTO</button>
     </div>
     
+    <div class="card" id="controlsCard" style="display:none">
+      <h2>🎛️ Controles de Emergencia</h2>
+      <button class="btn-green" onclick="silenceAlert()" id="btnSilence">🔕 SILENCIAR ALERTA</button>
+      <button class="btn-red" onclick="turnOffRelay()" style="margin-top:8px" id="btnRelayOff">🔌 APAGAR RELÉ/SIRENA</button>
+    </div>
+    
     <div class="card">
       <h2>📱 Acciones</h2>
       <button class="btn-blue" onclick="testTelegram()">📲 Probar Telegram</button>
@@ -202,6 +208,12 @@ String getEmbeddedHTML() {
         if(alertActive){banner.classList.add('active');document.getElementById('alertMsg').textContent=d.system.alert_message;}
         else{banner.classList.remove('active');}
         
+        // Mostrar controles de emergencia si hay alerta o relé activo
+        const relayOn=d.system.relay_on||false;
+        const controlsCard=document.getElementById('controlsCard');
+        if(alertActive||relayOn){controlsCard.style.display='block';}
+        else{controlsCard.style.display='none';}
+        
         document.getElementById('defrostStatus').style.display=defrostMode?'block':'none';
         document.getElementById('defrostTime').textContent=d.system.defrost_minutes||0;
         document.getElementById('btnDefrost').textContent=defrostMode?'✅ DESACTIVAR':'🧊 ACTIVAR DESCONGELAMIENTO';
@@ -235,6 +247,12 @@ String getEmbeddedHTML() {
     function formatUptime(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);if(h>0)return h+'h '+m+'m';if(m>0)return m+'m '+(s%60)+'s';return s+'s';}
     
     async function stopAlert(){await fetch('/api/alert/ack',{method:'POST'});fetchStatus();}
+    async function silenceAlert(){await fetch('/api/alert/ack',{method:'POST'});alert('✅ Alerta silenciada');fetchStatus();}
+    async function turnOffRelay(){
+      const r=await fetch('/api/relay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:false})});
+      alert(r.ok?'✅ Relé APAGADO':'❌ Error');
+      fetchStatus();
+    }
     async function testTelegram(){const r=await fetch('/api/telegram/test',{method:'POST'});alert(r.ok?'✅ Mensaje enviado':'❌ Error');}
     async function resetWifi(){if(confirm('¿Resetear WiFi?'))await fetch('/api/wifi/reset',{method:'POST'});}
     async function toggleDefrost(){

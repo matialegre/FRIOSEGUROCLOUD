@@ -71,5 +71,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Receiver para silenciar desde notificación -->
+        <receiver
+            android:name=".SilenceReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 </manifest>

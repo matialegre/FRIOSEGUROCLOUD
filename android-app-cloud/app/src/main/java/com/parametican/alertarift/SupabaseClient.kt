@@ -29,8 +29,12 @@ object SupabaseClient {
         val temp2: Float?,
         val humidity: Float?,
         val door1Open: Boolean,
+        val doorOpen: Boolean,  // Alias para compatibilidad
         val acPower: Boolean,
         val alertActive: Boolean,
+        val alertAcknowledged: Boolean,  // Si la alerta fue silenciada
+        val tempOverCritical: Boolean,   // Si temp > temp_critical
+        val highTempElapsedSec: Int,     // Segundos que lleva sobre el crítico
         val defrostMode: Boolean,
         val cooldownMode: Boolean,
         val cooldownRemainingSec: Int,
@@ -86,6 +90,7 @@ object SupabaseClient {
                 
                 val reading = if (readingsArray.length() > 0) readingsArray.getJSONObject(0) else null
                 
+                val door1OpenVal = reading?.optBoolean("door1_open", false) ?: false
                 devices.add(DeviceStatus(
                     deviceId = deviceId,
                     name = device.optString("name", deviceId),
@@ -97,9 +102,13 @@ object SupabaseClient {
                     temp1 = reading?.optDouble("temp1", -999.0)?.toFloat(),
                     temp2 = reading?.optDouble("temp2", -999.0)?.toFloat(),
                     humidity = reading?.optDouble("humidity", 0.0)?.toFloat(),
-                    door1Open = reading?.optBoolean("door1_open", false) ?: false,
+                    door1Open = door1OpenVal,
+                    doorOpen = door1OpenVal,
                     acPower = reading?.optBoolean("ac_power", true) ?: true,
                     alertActive = reading?.optBoolean("alert_active", false) ?: false,
+                    alertAcknowledged = reading?.optBoolean("alert_acknowledged", false) ?: false,
+                    tempOverCritical = reading?.optBoolean("temp_over_critical", false) ?: false,
+                    highTempElapsedSec = reading?.optInt("high_temp_elapsed_sec", 0) ?: 0,
                     defrostMode = reading?.optBoolean("defrost_mode", false) ?: false,
                     cooldownMode = reading?.optBoolean("cooldown_mode", false) ?: false,
                     cooldownRemainingSec = reading?.optInt("cooldown_remaining_sec", 0) ?: 0,
@@ -131,6 +140,7 @@ object SupabaseClient {
             val readingsArray = JSONArray(readingsJson)
             val reading = if (readingsArray.length() > 0) readingsArray.getJSONObject(0) else null
             
+            val door1OpenVal = reading?.optBoolean("door1_open", false) ?: false
             return DeviceStatus(
                 deviceId = deviceId,
                 name = device.optString("name", deviceId),
@@ -142,9 +152,13 @@ object SupabaseClient {
                 temp1 = reading?.optDouble("temp1", -999.0)?.toFloat(),
                 temp2 = reading?.optDouble("temp2", -999.0)?.toFloat(),
                 humidity = reading?.optDouble("humidity", 0.0)?.toFloat(),
-                door1Open = reading?.optBoolean("door1_open", false) ?: false,
+                door1Open = door1OpenVal,
+                doorOpen = door1OpenVal,
                 acPower = reading?.optBoolean("ac_power", true) ?: true,
                 alertActive = reading?.optBoolean("alert_active", false) ?: false,
+                alertAcknowledged = reading?.optBoolean("alert_acknowledged", false) ?: false,
+                tempOverCritical = reading?.optBoolean("temp_over_critical", false) ?: false,
+                highTempElapsedSec = reading?.optInt("high_temp_elapsed_sec", 0) ?: 0,
                 defrostMode = reading?.optBoolean("defrost_mode", false) ?: false,
                 cooldownMode = reading?.optBoolean("cooldown_mode", false) ?: false,
                 cooldownRemainingSec = reading?.optInt("cooldown_remaining_sec", 0) ?: 0,
@@ -195,14 +209,74 @@ object SupabaseClient {
      */
     fun acknowledgeAlert(alertId: Long): Boolean {
         return try {
+            AppLogger.info("SUPABASE", "Reconociendo alerta ID: $alertId")
             val body = JSONObject().apply {
                 put("acknowledged", true)
                 put("acknowledged_at", "now()")
                 put("acknowledged_by", "app_cloud")
             }
             apiPatch("/rest/v1/alerts?id=eq.$alertId", body.toString())
+            AppLogger.success("SUPABASE", "✓ Alerta $alertId reconocida")
             true
         } catch (e: Exception) {
+            AppLogger.error("SUPABASE", "✗ Error reconociendo alerta $alertId", e.message)
+            e.printStackTrace()
+            false
+        }
+    }
+    
+    /**
+     * Marcar alert_acknowledged en la última lectura del dispositivo
+     */
+    fun acknowledgeDeviceAlert(deviceId: String): Boolean {
+        return try {
+            AppLogger.info("SUPABASE", "Marcando alert_acknowledged para $deviceId")
+            val body = JSONObject().apply {
+                put("alert_acknowledged", true)
+            }
+            apiPatch("/rest/v1/readings?device_id=eq.$deviceId&order=created_at.desc&limit=1", body.toString())
+            AppLogger.success("SUPABASE", "✓ alert_acknowledged=true en readings de $deviceId")
+            true
+        } catch (e: Exception) {
+            AppLogger.error("SUPABASE", "✗ Error marcando acknowledge en readings", e.message)
+            e.printStackTrace()
+            false
+        }
+    }
+    
+    /**
+     * Enviar comando SILENCE al ESP32 via tabla commands
+     * El ESP32 lo lee cada 5 segundos y silencia su sirena/relay
+     */
+    fun sendSilenceCommand(deviceId: String): Boolean {
+        AppLogger.silenceCommandSent(deviceId)
+        return try {
+            // 1. Enviar comando SILENCE a la tabla commands
+            val cmdBody = JSONObject().apply {
+                put("device_id", deviceId)
+                put("command", "SILENCE")
+                put("status", "pending")
+                put("source", "app_cloud")
+            }
+            AppLogger.command("SILENCE", "POST /commands", cmdBody.toString())
+            apiPost("/rest/v1/commands", cmdBody.toString())
+            AppLogger.success("SILENCE", "✓ Comando SILENCE insertado en tabla commands")
+            
+            // 2. También marcar flag en devices para redundancia
+            val deviceBody = JSONObject().apply {
+                put("alert_acknowledged_remote", true)
+            }
+            AppLogger.command("SILENCE", "PATCH /devices", "alert_acknowledged_remote=true")
+            apiPatch("/rest/v1/devices?device_id=eq.$deviceId", deviceBody.toString())
+            AppLogger.success("SILENCE", "✓ Flag alert_acknowledged_remote=true en devices")
+            
+            // 3. Marcar en readings también
+            acknowledgeDeviceAlert(deviceId)
+            
+            AppLogger.silenceCommandConfirmed(deviceId)
+            true
+        } catch (e: Exception) {
+            AppLogger.silenceCommandFailed(deviceId, e.message ?: "Unknown error")
             e.printStackTrace()
             false
         }
@@ -304,6 +378,7 @@ object SupabaseClient {
     // ========================================
     
     private fun apiGet(endpoint: String): String {
+        AppLogger.supabaseRequest(endpoint, "GET")
         val url = URL("$SUPABASE_URL$endpoint")
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
@@ -318,13 +393,16 @@ object SupabaseClient {
             val reader = BufferedReader(InputStreamReader(connection.inputStream))
             val response = reader.readText()
             reader.close()
+            AppLogger.supabaseResponse(endpoint, responseCode, response.take(100))
             return response
         } else {
+            AppLogger.supabaseResponse(endpoint, responseCode, "Error")
             throw Exception("HTTP Error: $responseCode")
         }
     }
     
     private fun apiPost(endpoint: String, body: String): String {
+        AppLogger.supabaseRequest(endpoint, "POST", body)
         val url = URL("$SUPABASE_URL$endpoint")
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
@@ -346,13 +424,16 @@ object SupabaseClient {
             val reader = BufferedReader(InputStreamReader(connection.inputStream))
             val response = reader.readText()
             reader.close()
+            AppLogger.supabaseResponse(endpoint, responseCode, response.take(100))
             return response
         } else {
+            AppLogger.supabaseResponse(endpoint, responseCode, "Error")
             throw Exception("HTTP Error: $responseCode")
         }
     }
     
     private fun apiPatch(endpoint: String, body: String): String {
+        AppLogger.supabaseRequest(endpoint, "PATCH", body)
         val url = URL("$SUPABASE_URL$endpoint")
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "PATCH"
@@ -374,8 +455,10 @@ object SupabaseClient {
             val reader = BufferedReader(InputStreamReader(connection.inputStream))
             val response = reader.readText()
             reader.close()
+            AppLogger.supabaseResponse(endpoint, responseCode, response.take(100))
             return response
         } else {
+            AppLogger.supabaseResponse(endpoint, responseCode, "Error")
             throw Exception("HTTP Error: $responseCode")
         }
     }

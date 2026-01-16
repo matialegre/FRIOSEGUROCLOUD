@@ -50,6 +50,8 @@ struct SystemState {
   String alertMessage;
   unsigned long alertStartTime;
   unsigned long highTempStartTime;
+  int highTempElapsedSec;          // Segundos que lleva la temp por encima del crítico
+  bool tempOverCritical;           // Si la temp está actualmente sobre el crítico
   bool relayState;
   bool internetAvailable;
   bool wifiConnected;

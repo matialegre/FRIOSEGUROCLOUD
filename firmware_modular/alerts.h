@@ -94,6 +94,8 @@ void checkAlerts() {
       Serial.printf("[DESCONGELAMIENTO] Activo hace %lu min - Alertas suspendidas\n", defrostMin);
       lastDefrostLog = millis();
     }
+    state.tempOverCritical = false;
+    state.highTempElapsedSec = 0;
     return;
   }
   
@@ -106,6 +108,8 @@ void checkAlerts() {
       Serial.printf("[COOLDOWN] Esperando %d:%02d min - Alertas suspendidas\n", minRemaining, secRemaining);
       lastCooldownLog = millis();
     }
+    state.tempOverCritical = false;
+    state.highTempElapsedSec = 0;
     return;
   }
   
@@ -113,8 +117,19 @@ void checkAlerts() {
   unsigned long now = millis();
   
   if (temp > config.tempCritical) {
+    state.tempOverCritical = true;
+    
     if (lastAlertCheck > 0) {
       highTempSec += (now - lastAlertCheck) / 1000;
+    }
+    state.highTempElapsedSec = highTempSec;  // Sincronizar con state
+    
+    // Log de progreso hacia alerta
+    static unsigned long lastProgressLog = 0;
+    if (now - lastProgressLog > 10000) {
+      Serial.printf("⚠️ [ALERTA] Temp %.1f°C > %.1f°C - Tiempo: %lu/%d seg\n", 
+        temp, config.tempCritical, highTempSec, config.alertDelaySec);
+      lastProgressLog = now;
     }
     
     if (highTempSec >= (unsigned long)config.alertDelaySec && !state.alertActive && !state.alertAcknowledged) {
@@ -123,6 +138,8 @@ void checkAlerts() {
     }
   } else {
     highTempSec = 0;
+    state.highTempElapsedSec = 0;
+    state.tempOverCritical = false;
     state.alertAcknowledged = false;
     
     if (state.alertActive) {

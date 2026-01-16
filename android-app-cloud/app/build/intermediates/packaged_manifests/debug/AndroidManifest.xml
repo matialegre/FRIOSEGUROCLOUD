@@ -71,6 +71,12 @@
             android:theme="@style/Theme.AlertaRift.Fullscreen"
             android:turnScreenOn="true" />
 
+        <!-- Actividad de logs -->
+        <activity
+            android:name="com.parametican.alertarift.LogsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AlertaRift" />
+
         <!-- Servicio de monitoreo en segundo plano -->
         <service
             android:name="com.parametican.alertarift.MonitorService"
@@ -87,6 +93,12 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Receiver para silenciar desde notificación -->
+        <receiver
+            android:name="com.parametican.alertarift.SilenceReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <provider
             android:name="androidx.startup.InitializationProvider"

@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- DESARROLLO BAHIA - Naranja con engranaje -->
+    <path android:fillColor="#EA580C" android:pathData="M0,0h48v48H0z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M24,8L24,24M18,14L24,8L30,14"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M14,28h20v12H14z"/>
+    <path android:fillColor="#FDBA74" android:pathData="M18,32h12v6h-12z"/>
+    <path android:fillColor="#FEF3C7" android:pathData="M6,44L12,38L18,42L24,36L30,40L36,34L42,44z"/>
+</vector>

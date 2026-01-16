@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#FF0000"
+    android:padding="30dp">
+
+    <!-- Icono de alerta -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⚠️"
+        android:textSize="100sp"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Título -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ALERTA CRÍTICA"
+        android:textSize="36sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="30dp" />
+
+    <!-- Mensaje -->
+    <TextView
+        android:id="@+id/tvAlertMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Temperatura fuera de rango"
+        android:textSize="24sp"
+        android:textColor="#FFFFFF"
+        android:gravity="center"
+        android:padding="20dp"
+        android:background="#CC0000"
+        android:layout_marginBottom="50dp" />
+
+    <!-- Instrucción -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="REVISAR REEFER INMEDIATAMENTE"
+        android:textSize="18sp"
+        android:textColor="#FFCCCC"
+        android:gravity="center"
+        android:layout_marginBottom="30dp" />
+
+    <!-- Botón detener -->
+    <Button
+        android:id="@+id/btnSilence"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🛑 DETENER ALERTA"
+        android:textSize="24sp"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#16a34a"
+        android:padding="24dp" />
+
+    <!-- Nota -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Esto detendrá la alerta en TODOS los dispositivos"
+        android:textSize="14sp"
+        android:textColor="#FFAAAA"
+        android:gravity="center"
+        android:layout_marginTop="15dp" />
+
+</LinearLayout>

@@ -25,10 +25,10 @@ com.parametican.alertarift.app-savedstate-1.2.1-23 C:\Users\alegr\.gradle\caches
 com.parametican.alertarift.app-viewpager2-1.0.0-24 C:\Users\alegr\.gradle\caches\transforms-3\e267e5baac714bf31c0814ac9b21d72c\transformed\viewpager2-1.0.0\res
 com.parametican.alertarift.app-emoji2-views-helper-1.2.0-25 C:\Users\alegr\.gradle\caches\transforms-3\e4651e135791e7b173462990da7e357d\transformed\emoji2-views-helper-1.2.0\res
 com.parametican.alertarift.app-lifecycle-viewmodel-2.6.1-26 C:\Users\alegr\.gradle\caches\transforms-3\f1bbd3b57b4092aea08b37f6a517a552\transformed\lifecycle-viewmodel-2.6.1\res
-com.parametican.alertarift.app-pngs-27 C:\Users\alegr\OneDrive\Desktop\alda\campamento-parametican\android-app\app\build\generated\res\pngs\debug
-com.parametican.alertarift.app-resValues-28 C:\Users\alegr\OneDrive\Desktop\alda\campamento-parametican\android-app\app\build\generated\res\resValues\debug
-com.parametican.alertarift.app-packageDebugResources-29 C:\Users\alegr\OneDrive\Desktop\alda\campamento-parametican\android-app\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
-com.parametican.alertarift.app-packageDebugResources-30 C:\Users\alegr\OneDrive\Desktop\alda\campamento-parametican\android-app\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
-com.parametican.alertarift.app-merged_res-31 C:\Users\alegr\OneDrive\Desktop\alda\campamento-parametican\android-app\app\build\intermediates\merged_res\debug
-com.parametican.alertarift.app-debug-32 C:\Users\alegr\OneDrive\Desktop\alda\campamento-parametican\android-app\app\src\debug\res
-com.parametican.alertarift.app-main-33 C:\Users\alegr\OneDrive\Desktop\alda\campamento-parametican\android-app\app\src\main\res
+com.parametican.alertarift.app-pngs-27 C:\Users\alegr\OneDrive\Desktop\FRIOSEGUROCLOUD-master\FRIOSEGUROCLOUD-master\android-app\app\build\generated\res\pngs\debug
+com.parametican.alertarift.app-resValues-28 C:\Users\alegr\OneDrive\Desktop\FRIOSEGUROCLOUD-master\FRIOSEGUROCLOUD-master\android-app\app\build\generated\res\resValues\debug
+com.parametican.alertarift.app-packageDebugResources-29 C:\Users\alegr\OneDrive\Desktop\FRIOSEGUROCLOUD-master\FRIOSEGUROCLOUD-master\android-app\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.parametican.alertarift.app-packageDebugResources-30 C:\Users\alegr\OneDrive\Desktop\FRIOSEGUROCLOUD-master\FRIOSEGUROCLOUD-master\android-app\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.parametican.alertarift.app-merged_res-31 C:\Users\alegr\OneDrive\Desktop\FRIOSEGUROCLOUD-master\FRIOSEGUROCLOUD-master\android-app\app\build\intermediates\merged_res\debug
+com.parametican.alertarift.app-debug-32 C:\Users\alegr\OneDrive\Desktop\FRIOSEGUROCLOUD-master\FRIOSEGUROCLOUD-master\android-app\app\src\debug\res
+com.parametican.alertarift.app-main-33 C:\Users\alegr\OneDrive\Desktop\FRIOSEGUROCLOUD-master\FRIOSEGUROCLOUD-master\android-app\app\src\main\res

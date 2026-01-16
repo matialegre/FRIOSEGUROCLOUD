@@ -88,6 +88,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Receiver para silenciar desde notificación -->
+        <receiver
+            android:name="com.parametican.alertarift.SilenceReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="com.parametican.alertarift.androidx-startup"

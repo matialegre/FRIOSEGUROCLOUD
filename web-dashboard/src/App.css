@@ -904,6 +904,69 @@ body {
 }
 
 /* ============================================
+   CONTROLES REMOTOS
+   ============================================ */
+.controls-section {
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid #475569;
+}
+
+.controls-section h3 {
+  margin-bottom: 1rem;
+  color: #94a3b8;
+  font-size: 1rem;
+}
+
+.controls-grid {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.control-btn {
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.control-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.control-btn:active {
+  transform: scale(0.98);
+}
+
+.silence-btn {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: white;
+}
+
+.silence-btn:hover {
+  background: linear-gradient(135deg, #15803d, #16a34a);
+}
+
+.relay-btn {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: white;
+}
+
+.relay-btn:hover {
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 @media (max-width: 768px) {

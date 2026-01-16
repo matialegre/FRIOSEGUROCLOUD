@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getDevicesWithReadings, getDeviceConfig, updateDeviceConfig, getActiveAlerts, acknowledgeAlert, resolveAlert, silenceDeviceAlert } from './supabaseClient'
+import { getDevicesWithReadings, getDeviceConfig, updateDeviceConfig, getActiveAlerts, acknowledgeAlert, resolveAlert, silenceDeviceAlert, sendCommand } from './supabaseClient'
 import { AppLogger } from './AppLogger'
 import Login from './Login'
 import './App.css'
@@ -495,6 +495,51 @@ function Dashboard({ user, onLogout }) {
               <span className="status-value">{reading?.defrostMode ? 'ACTIVO' : 'Inactivo'}</span>
             </div>
           </div>
+
+          {/* Controles remotos */}
+          {(reading?.alertActive || reading?.relayOn) && (
+            <div className="controls-section">
+              <h3>🎛️ Controles Remotos</h3>
+              <div className="controls-grid">
+                {reading?.alertActive && (
+                  <button 
+                    className="control-btn silence-btn"
+                    onClick={async () => {
+                      if (confirm(`¿Silenciar alerta de ${selectedDevice.name || selectedDevice.device_id}?`)) {
+                        const result = await silenceDeviceAlert(selectedDevice.device_id)
+                        if (result) {
+                          alert('✅ Comando SILENCE enviado (esperar ~5s)')
+                          loadData()
+                        } else {
+                          alert('❌ Error enviando comando')
+                        }
+                      }
+                    }}
+                  >
+                    🔕 SILENCIAR ALERTA
+                  </button>
+                )}
+                {reading?.relayOn && (
+                  <button 
+                    className="control-btn relay-btn"
+                    onClick={async () => {
+                      if (confirm(`¿Apagar relé/sirena de ${selectedDevice.name || selectedDevice.device_id}?`)) {
+                        const result = await sendCommand(selectedDevice.device_id, 'RELAY_OFF')
+                        if (result) {
+                          alert('✅ Comando RELAY_OFF enviado (esperar ~5s)')
+                          loadData()
+                        } else {
+                          alert('❌ Error enviando comando')
+                        }
+                      }
+                    }}
+                  >
+                    🔌 APAGAR RELÉ/SIRENA
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Info de conexión */}
           <div className="connection-info">

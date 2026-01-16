@@ -90,6 +90,9 @@ bool supabaseSendReading() {
   doc["relay_on"] = state.relayState;
   doc["buzzer_on"] = false;  // TODO: agregar variable
   doc["alert_active"] = state.alertActive;
+  doc["alert_acknowledged"] = state.alertAcknowledged;
+  doc["temp_over_critical"] = state.tempOverCritical;
+  doc["high_temp_elapsed_sec"] = state.highTempElapsedSec;
   doc["defrost_mode"] = state.defrostMode;
   doc["cooldown_mode"] = state.cooldownMode;
   doc["cooldown_remaining_sec"] = state.cooldownRemainingSec;
@@ -473,16 +476,43 @@ void supabaseSync() {
     }
   }
   
-  // Verificar comandos cada 30 segundos
+  // Verificar comandos cada 5 segundos (más rápido para respuesta inmediata)
   static unsigned long lastCommandCheck = 0;
-  if (now - lastCommandCheck >= 30000) {
+  if (now - lastCommandCheck >= 5000) {
     lastCommandCheck = now;
     
     if (state.internetAvailable) {
       String cmd = supabaseCheckCommands();
       if (cmd.length() > 0) {
-        // Procesar comando (integrar con serial_api.h)
-        // processCommand(cmd);
+        // Procesar comandos de Supabase
+        Serial.printf("[SUPABASE] Procesando comando: %s\n", cmd.c_str());
+        
+        if (cmd == "SILENCE" || cmd == "ALERT_ACK") {
+          acknowledgeAlert();
+          Serial.println("[SUPABASE] ✓ Alerta silenciada");
+        }
+        else if (cmd == "RELAY_OFF") {
+          setRelay(false);
+          Serial.println("[SUPABASE] ✓ Relé APAGADO");
+        }
+        else if (cmd == "RELAY_ON") {
+          setRelay(true);
+          Serial.println("[SUPABASE] ✓ Relé ENCENDIDO");
+        }
+        else if (cmd == "DEFROST_ON") {
+          state.defrostMode = true;
+          state.defrostStartTime = millis();
+          state.alertActive = false;
+          setRelay(false);
+          Serial.println("[SUPABASE] ✓ Modo descongelamiento ACTIVADO");
+        }
+        else if (cmd == "DEFROST_OFF") {
+          state.defrostMode = false;
+          Serial.println("[SUPABASE] ✓ Modo descongelamiento DESACTIVADO");
+        }
+        else {
+          Serial.printf("[SUPABASE] Comando no reconocido: %s\n", cmd.c_str());
+        }
       }
     }
   }

@@ -98,6 +98,17 @@
                 android:backgroundTint="#16a34a"
                 android:textSize="18sp"
                 android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnRelayOff"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="🔌 APAGAR RELÉ/SIRENA"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#dc2626"
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <!-- Simulation Badge -->

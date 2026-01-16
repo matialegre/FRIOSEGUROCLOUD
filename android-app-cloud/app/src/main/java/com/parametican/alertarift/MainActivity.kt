@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvConfigDefrostRelay: TextView
     private lateinit var tvDefrostSignal: TextView
     private lateinit var btnSilence: Button
+    private lateinit var btnRelayOff: Button
     private lateinit var btnLogout: Button
     private lateinit var btnRefresh: Button
     private lateinit var alertBanner: LinearLayout
@@ -50,6 +51,9 @@ class MainActivity : AppCompatActivity() {
     
     // Lista de dispositivos desde Supabase
     private var devices = mutableListOf<SupabaseClient.DeviceStatus>()
+    
+    // Configuración actual del dispositivo seleccionado
+    private var currentConfig: SupabaseClient.DeviceConfig? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +62,19 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setupButtons()
         startAutoRefresh()
+        
+        // Iniciar MonitorService para polling y alarmas en background
+        startMonitorService()
+    }
+    
+    private fun startMonitorService() {
+        AppLogger.info("SERVICE", "Iniciando MonitorService desde MainActivity")
+        val serviceIntent = Intent(this, MonitorService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
     }
     
     override fun onDestroy() {
@@ -86,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         tvConfigDefrostRelay = findViewById(R.id.tvConfigDefrostRelay)
         tvDefrostSignal = findViewById(R.id.tvDefrostSignal)
         btnSilence = findViewById(R.id.btnSilence)
+        btnRelayOff = findViewById(R.id.btnRelayOff)
         btnLogout = findViewById(R.id.btnLogout)
         simBadge = findViewById(R.id.simBadge)
         reefersContainer = findViewById(R.id.reefersContainer)
@@ -112,6 +130,10 @@ class MainActivity : AppCompatActivity() {
 
         btnSilence.setOnClickListener {
             silenceAlert()
+        }
+        
+        btnRelayOff.setOnClickListener {
+            turnOffRelay()
         }
         
         btnLogout.setOnClickListener {
@@ -167,6 +189,9 @@ class MainActivity : AppCompatActivity() {
                             (etDefrostCooldown.text.toString().toIntOrNull() ?: (config.defrostCooldownSec / 60)) * 60,
                             etDoorMaxTime.text.toString().toIntOrNull() ?: config.doorOpenMaxSec
                         )
+                    }
+                    .setNeutralButton("📋 LOGS") { _, _ ->
+                        startActivity(Intent(this, LogsActivity::class.java))
                     }
                     .setNegativeButton("Cancelar", null)
                     .show()
@@ -230,6 +255,9 @@ class MainActivity : AppCompatActivity() {
                 
                 runOnUiThread {
                     if (device != null) {
+                        // Guardar configuración actual para usar en updateDisplay
+                        currentConfig = config
+                        
                         updateDisplay(device)
                         populateReefers()
                         
@@ -364,11 +392,36 @@ class MainActivity : AppCompatActivity() {
         // Antigüedad de la lectura del ESP
         updateReadingAge(device.readingCreatedAt)
         
-        // Alerta
-        if (device.alertActive) {
+        // Cronómetro de cuenta regresiva ANTES de la alerta
+        if (device.tempOverCritical && !device.alertActive && device.highTempElapsedSec > 0) {
+            // Mostrar banner de advertencia con cronómetro
             alertBanner.visibility = View.VISIBLE
-            tvAlertMessage.text = "⚠️ ALERTA ACTIVA"
-            btnSilence.visibility = View.VISIBLE
+            alertBanner.setBackgroundColor(Color.parseColor("#FF9800")) // Naranja para advertencia
+            
+            // Calcular tiempo restante
+            val alertDelaySec = currentConfig?.alertDelaySec ?: 60
+            val elapsed = device.highTempElapsedSec
+            val remaining = Math.max(0, alertDelaySec - elapsed)
+            val minR = remaining / 60
+            val secR = remaining % 60
+            
+            tvAlertMessage.text = "⏱️ ALERTA EN ${minR}:${String.format("%02d", secR)} (${elapsed}/${alertDelaySec}s)"
+            btnSilence.visibility = View.GONE
+            
+            AppLogger.info("COUNTDOWN", "Temp sobre crítico - Tiempo: ${elapsed}/${alertDelaySec}s, Restante: ${remaining}s")
+        }
+        // Alerta ACTIVA
+        else if (device.alertActive) {
+            alertBanner.visibility = View.VISIBLE
+            alertBanner.setBackgroundColor(Color.parseColor("#F44336")) // Rojo para alerta
+            
+            if (device.alertAcknowledged) {
+                tvAlertMessage.text = "🔕 ALERTA SILENCIADA"
+                btnSilence.visibility = View.GONE
+            } else {
+                tvAlertMessage.text = "⚠️ ALERTA ACTIVA"
+                btnSilence.visibility = View.VISIBLE
+            }
         } else {
             alertBanner.visibility = View.GONE
             btnSilence.visibility = View.GONE
@@ -415,21 +468,70 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun silenceAlert() {
+        AppLogger.info("SILENCE", "🔕 Usuario presionó SILENCIAR", "Device: $selectedDeviceId")
+        
+        // Detener alarma local inmediatamente
+        MonitorService.silenceAlarm()
+        btnSilence.visibility = View.GONE
+        tvAlertMessage.text = "🔕 SILENCIANDO..."
+        
         thread {
             try {
-                // Obtener alertas activas del dispositivo seleccionado
+                // 1. Enviar comando SILENCE al ESP32
+                AppLogger.command("SILENCE", "Enviando comando SILENCE al ESP32", selectedDeviceId)
+                val silenceResult = SupabaseClient.sendSilenceCommand(selectedDeviceId)
+                
+                if (silenceResult) {
+                    AppLogger.success("SILENCE", "✓ Comando SILENCE enviado correctamente")
+                } else {
+                    AppLogger.error("SILENCE", "✗ Falló envío de comando SILENCE")
+                }
+                
+                // 2. Obtener alertas activas del dispositivo seleccionado
                 val alerts = SupabaseClient.getActiveAlerts()
                 val deviceAlerts = alerts.filter { it.deviceId == selectedDeviceId }
+                AppLogger.info("SILENCE", "Alertas activas encontradas: ${deviceAlerts.size}")
                 
                 for (alert in deviceAlerts) {
+                    AppLogger.info("SILENCE", "Reconociendo alerta ID: ${alert.id}")
                     SupabaseClient.acknowledgeAlert(alert.id)
                 }
                 
                 runOnUiThread {
+                    tvAlertMessage.text = "🔕 ALERTA SILENCIADA"
                     Toast.makeText(this, "✅ Alertas silenciadas", Toast.LENGTH_SHORT).show()
+                    AppLogger.success("SILENCE", "✓ Proceso de silenciado completado")
                     refreshData()
                 }
             } catch (e: Exception) {
+                AppLogger.error("SILENCE", "✗ Error en silenceAlert", e.message)
+                runOnUiThread {
+                    Toast.makeText(this, "❌ Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    
+    private fun turnOffRelay() {
+        Toast.makeText(this, "🔌 Enviando RELAY_OFF a $selectedDeviceId...", Toast.LENGTH_SHORT).show()
+        
+        thread {
+            try {
+                // Enviar comando RELAY_OFF a través de Supabase
+                AppLogger.command("RELAY", "Enviando RELAY_OFF", selectedDeviceId)
+                val result = SupabaseClient.sendCommand(selectedDeviceId, "RELAY_OFF")
+                
+                runOnUiThread {
+                    if (result) {
+                        Toast.makeText(this, "✅ Comando enviado a $selectedDeviceId (esperar ~5s)", Toast.LENGTH_LONG).show()
+                        AppLogger.success("RELAY", "✓ Comando RELAY_OFF enviado a $selectedDeviceId")
+                    } else {
+                        Toast.makeText(this, "❌ Error enviando comando", Toast.LENGTH_SHORT).show()
+                        AppLogger.error("RELAY", "✗ Error enviando RELAY_OFF")
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.error("RELAY", "✗ Excepción", e.message)
                 runOnUiThread {
                     Toast.makeText(this, "❌ Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }

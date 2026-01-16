@@ -219,6 +219,23 @@ export async function sendSilenceCommand(deviceId) {
   }
 }
 
+// Enviar comando genérico al ESP32
+export async function sendCommand(deviceId, command) {
+  try {
+    await supabasePost('commands', {
+      device_id: deviceId,
+      command: command,
+      status: 'pending',
+      source: 'web_dashboard'
+    })
+    console.log(`✓ Comando ${command} enviado a ${deviceId}`)
+    return true
+  } catch (error) {
+    console.error(`Error sending ${command} command:`, error)
+    return false
+  }
+}
+
 // Silenciar alerta completa (ESP32 + apps + base de datos)
 export async function silenceDeviceAlert(deviceId) {
   try {

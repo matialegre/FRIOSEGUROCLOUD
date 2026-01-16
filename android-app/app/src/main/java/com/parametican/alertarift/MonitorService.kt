@@ -19,7 +19,7 @@ class MonitorService : Service() {
     companion object {
         const val TAG = "MonitorService"
         const val CHANNEL_ID = "parametican_monitor"
-        const val CHANNEL_ALERT_ID = "parametican_alert"
+        const val CHANNEL_ALERT_ID = "parametican_alert_v2"  // v2 para IMPORTANCE_MAX
         const val NOTIFICATION_ID = 1
         const val ALERT_NOTIFICATION_ID = 2
         
@@ -109,13 +109,13 @@ class MonitorService : Service() {
                 description = "Estado del monitoreo de temperatura"
             }
 
-            // Canal para alertas (máxima prioridad)
+            // Canal para alertas (máxima prioridad - HEADS UP)
             val alertChannel = NotificationChannel(
                 CHANNEL_ALERT_ID,
                 "Alertas Críticas",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_MAX  // MAX para heads-up notification
             ).apply {
-                description = "Alertas de temperatura crítica"
+                description = "Alertas de temperatura crítica - URGENTE"
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 500)
                 setSound(
@@ -127,6 +127,8 @@ class MonitorService : Service() {
                 )
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setBypassDnd(true) // Ignorar No Molestar
+                enableLights(true)
+                lightColor = 0xFFFF0000.toInt()  // Rojo
             }
 
             val manager = getSystemService(NotificationManager::class.java)
@@ -304,6 +306,9 @@ class MonitorService : Service() {
     private fun showAlertNotification(message: String) {
         val intent = Intent(this, AlertActivity::class.java).apply {
             putExtra("message", message)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
@@ -315,8 +320,25 @@ class MonitorService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Acción de silenciar directamente desde la notificación
+        val silenceActionIntent = Intent(this, SilenceReceiver::class.java)
+        val silenceActionPendingIntent = PendingIntent.getBroadcast(
+            this, 0, silenceActionIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Acción de abrir la app
+        val openIntent = Intent(this, AlertActivity::class.java).apply {
+            putExtra("message", message)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val openPendingIntent = PendingIntent.getActivity(
+            this, 3, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ALERT_ID)
-            .setContentTitle("🚨 ALERTA CRÍTICA")
+            .setContentTitle("🚨🚨 ALERTA CRÍTICA 🚨🚨")
             .setContentText(message)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -326,6 +348,13 @@ class MonitorService : Service() {
             .setAutoCancel(false)
             .setOngoing(true)
             .setVibrate(longArrayOf(0, 500, 200, 500, 200, 500))
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(0xFFFF0000.toInt())
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🔕 DETENER ALARMA", silenceActionPendingIntent)
+            .addAction(android.R.drawable.ic_menu_view, "📱 ABRIR APP", openPendingIntent)
+            .setStyle(NotificationCompat.BigTextStyle()
+                .setBigContentTitle("🚨🚨 ALERTA CRÍTICA 🚨🚨")
+                .bigText("$message\n\n⬇️ Desliza para ver opciones\n🔕 DETENER ALARMA - Silencia sin abrir\n📱 ABRIR APP - Ver detalles"))
             .build()
 
         val manager = getSystemService(NotificationManager::class.java)
