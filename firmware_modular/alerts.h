@@ -21,15 +21,26 @@ static unsigned long highTempSec = 0;
 static unsigned long lastAlertCheck = 0;
 
 // ============================================
-// ACTIVAR ALERTA
+// ACTIVAR ALERTA (con protección anti-duplicados)
 // ============================================
+static unsigned long lastTriggerTime = 0;
+
 void triggerAlert(String message, bool critical = true) {
+  // Si ya hay alerta activa, no hacer nada
   if (state.alertActive) return;
+  
+  // Debounce: no disparar otra alerta si pasaron menos de 5 segundos
+  unsigned long now = millis();
+  if (lastTriggerTime > 0 && (now - lastTriggerTime) < 5000) {
+    Serial.println("[ALERTA] Ignorando trigger duplicado (debounce)");
+    return;
+  }
+  lastTriggerTime = now;
   
   state.alertActive = true;
   state.criticalAlert = critical;
   state.alertMessage = message;
-  state.alertStartTime = millis();
+  state.alertStartTime = now;
   state.totalAlerts++;
   state.alertAcknowledged = false;
   
@@ -43,7 +54,6 @@ void triggerAlert(String message, bool critical = true) {
   }
   
   if (config.telegramEnabled && state.internetAvailable) {
-    unsigned long now = millis();
     if (now - state.lastTelegramAlert > 300000) {
       sendTelegramAlert("🚨 *ALERTA CRÍTICA*\n\n" + message);
       state.lastTelegramAlert = now;
@@ -71,10 +81,18 @@ void clearAlert() {
 }
 
 // ============================================
-// RECONOCER ALERTA
+// RECONOCER ALERTA (con debounce)
 // ============================================
 void acknowledgeAlert() {
+  // Debounce: ignorar si ya se silenció hace menos de 2 segundos
+  unsigned long now = millis();
+  if (state.lastAckTime > 0 && (now - state.lastAckTime) < 2000) {
+    Serial.println("[ALERTA] Ignorando ack duplicado (debounce)");
+    return;
+  }
+  
   state.alertAcknowledged = true;
+  state.lastAckTime = now;
   setRelay(false);
   digitalWrite(PIN_BUZZER, LOW);
   Serial.println("🔕 [ALERTA] Alerta silenciada");

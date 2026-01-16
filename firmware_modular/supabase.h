@@ -316,10 +316,54 @@ void supabaseSendMaintenanceLog(float compressorHours, int compressorStarts,
 }
 
 // ============================================
+// SUBIR CONFIGURACIÓN LOCAL A SUPABASE
+// ============================================
+bool supabaseUploadConfig() {
+  if (!config.supabaseEnabled || !state.internetAvailable) return false;
+  
+  HTTPClient http;
+  String url = String(SUPABASE_URL) + "/rest/v1/devices?device_id=eq." + String(DEVICE_ID);
+  
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
+  http.addHeader("Prefer", "return=minimal");
+  
+  StaticJsonDocument<256> doc;
+  doc["temp_critical"] = config.tempCritical;
+  doc["alert_delay_sec"] = config.alertDelaySec;
+  doc["defrost_cooldown_sec"] = config.defrostCooldownSec;
+  doc["door_open_max_sec"] = config.doorOpenMaxSec;
+  
+  String payload;
+  serializeJson(doc, payload);
+  
+  int code = http.PATCH(payload);
+  http.end();
+  
+  if (code == 200 || code == 204) {
+    Serial.println("[SUPABASE] ✓ Config local subida a la nube");
+    return true;
+  }
+  
+  Serial.printf("[SUPABASE] ✗ Error subiendo config: %d\n", code);
+  return false;
+}
+
+// ============================================
 // LEER CONFIGURACIÓN DESDE SUPABASE
 // ============================================
 bool supabaseFetchConfig() {
   if (!config.supabaseEnabled || !state.internetAvailable) return false;
+  
+  // NO sincronizar desde Supabase si la config fue modificada localmente en los últimos 5 minutos
+  // Esto evita que la app local y Supabase se pisen mutuamente
+  unsigned long now = millis();
+  if (state.lastLocalConfigChange > 0 && (now - state.lastLocalConfigChange) < 300000) {
+    Serial.println("[SUPABASE] Config local reciente, no sincronizo desde nube");
+    return false;
+  }
   
   HTTPClient http;
   String url = String(SUPABASE_URL) + "/rest/v1/devices";

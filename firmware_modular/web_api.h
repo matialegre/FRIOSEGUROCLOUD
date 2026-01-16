@@ -24,6 +24,7 @@ extern void setRelay(bool on);
 extern bool testTelegram();
 extern void resetWiFi();
 extern String getEmbeddedHTML();
+extern bool supabaseUploadConfig();
 
 // ============================================
 // HANDLER: Página principal
@@ -152,7 +153,15 @@ void handleApiSetConfig() {
   
   Serial.printf("[CONFIG] Guardado: tempCrit=%.1f, supabase=%d\n", config.tempCritical, config.supabaseEnabled);
   
+  // Marcar timestamp de config local para evitar que Supabase la pise
+  state.lastLocalConfigChange = millis();
+  
   saveConfig();
+  
+  // Subir config a Supabase para mantener sincronizado (si está habilitado)
+  if (config.supabaseEnabled && state.internetAvailable) {
+    supabaseUploadConfig();
+  }
   
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", "{\"success\":true}");

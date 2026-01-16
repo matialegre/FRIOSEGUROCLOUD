@@ -68,6 +68,8 @@ struct SystemState {
   bool cooldownMode;              // En período de espera post-descongelamiento
   unsigned long cooldownStartTime; // Cuándo empezó el cooldown
   int cooldownRemainingSec;        // Segundos restantes de cooldown
+  unsigned long lastLocalConfigChange;  // Timestamp de última config local (para no pisar con Supabase)
+  unsigned long lastAckTime;            // Timestamp de último acknowledge (debounce)
 };
 
 struct HistoryPoint {
